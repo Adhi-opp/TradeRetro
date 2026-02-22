@@ -484,11 +484,11 @@ class SimulationEngine {
         totalDays: this.marketData.length
       },
       
-      // Detailed data
+      
       equityCurve: this.equityCurve,
       trades: this.trades,
       
-      // Strategy config
+      
       strategy: this.strategyConfig
     };
     
