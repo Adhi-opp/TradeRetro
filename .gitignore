@@ -1,0 +1,18 @@
+# Node & React
+node_modules/
+dist/
+build/
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS Files
+.DS_Store
+
+# Data (Forces team to fetch their own local data)
+bs_detector/nse_data/*.csv
+bs_detector/nse_data/*.json

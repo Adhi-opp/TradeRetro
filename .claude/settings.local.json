@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(pip install:*)",
+      "Bash(python data/fetch_nse_data.py:*)",
+      "Bash(curl:*)",
+      "Bash(python -m json.tool:*)"
+    ]
+  }
+}
