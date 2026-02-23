@@ -190,10 +190,7 @@ bs_detector/
 ### NSE (India)
 RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK, SBIN, HINDUNILVR, BAJFINANCE, BHARTIARTL, WIPRO
 
-### US Market
-AAPL
 
----
 
 ## License
 
