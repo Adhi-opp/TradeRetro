@@ -2,8 +2,12 @@ import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 
 const NSE_STOCKS = [
-  'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-  'HINDUNILVR', 'SBIN', 'BAJFINANCE', 'BHARTIARTL', 'WIPRO',
+  'HDFCBANK', 'ICICIBANK', 'SBIN', 'AXISBANK',
+  'TCS', 'INFY', 'WIPRO', 'HCLTECH',
+  'RELIANCE', 'ONGC',
+  'HINDUNILVR', 'ITC',
+  'BAJFINANCE', 'BHARTIARTL',
+  'NIFTY50', 'BANKNIFTY',
 ];
 
 export default function AiVerifyForm({ onVerify, isLoading }) {
@@ -14,6 +18,7 @@ export default function AiVerifyForm({ onVerify, isLoading }) {
   const [exitBody, setExitBody] = useState(
     'p = (candle.close - entry_price) / entry_price\nreturn p > 0.08 or p < -0.04'
   );
+  const [initialCapital, setInitialCapital] = useState(100000);
   const [claimedWinRate, setClaimedWinRate] = useState('');
   const [claimedReturn, setClaimedReturn] = useState('');
 
@@ -21,6 +26,7 @@ export default function AiVerifyForm({ onVerify, isLoading }) {
     e.preventDefault();
     const payload = {
       stock,
+      initial_capital: Number(initialCapital),
       entry_body: entryBody,
       exit_body: exitBody,
       ai_claims: {},
@@ -48,6 +54,21 @@ export default function AiVerifyForm({ onVerify, isLoading }) {
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="aiCapital">Initial Capital (₹)</label>
+          <input
+            id="aiCapital"
+            type="number"
+            value={initialCapital}
+            onChange={(e) => setInitialCapital(e.target.value)}
+            disabled={isLoading}
+            required
+            min="1000"
+            max="100000000"
+            step="1000"
+          />
         </div>
 
         <div className="form-field form-field-wide">

@@ -59,6 +59,10 @@ const MarketData = mongoose.model('MarketData', marketDataSchema);
 // Single source of truth for every strategy's parameter contract.
 // Add new strategy types here — validation picks them up automatically.
 
+// Shared optional params accepted by all strategies (not range-validated)
+const SHARED_OPTIONAL_PARAMS = new Set(['costModel', 'seed']);
+const VALID_COST_MODELS = ['GROSS', 'INDIA_EQUITY'];
+
 const STRATEGY_SCHEMAS = {
   MOVING_AVERAGE_CROSSOVER: {
     params: {
@@ -103,7 +107,7 @@ const STRATEGY_SCHEMAS = {
       initialCapital:  { type: 'number',  required: true,  min: 100, max: 1e8      },
       fees:            { type: 'number',  required: false, min: 0,   max: 0.05     }
     },
-    minCandles: () => 35, // 26 (slow EMA) + 9 (signal) for reliable MACD
+    minCandles: () => 35,
     crossRules: []
   }
 };
@@ -236,9 +240,25 @@ function validateBacktest(body) {
       }
     }
 
+    // Validate costModel if provided
+    if (params.costModel !== undefined && !VALID_COST_MODELS.includes(params.costModel)) {
+      errors.push({
+        field: 'params.costModel',
+        message: `costModel must be one of: ${VALID_COST_MODELS.join(', ')}`,
+        received: params.costModel
+      });
+    }
+
+    // Validate seed if provided
+    if (params.seed !== undefined && params.seed !== null) {
+      if (typeof params.seed !== 'number' || !Number.isInteger(params.seed)) {
+        errors.push({ field: 'params.seed', message: 'seed must be an integer', received: params.seed });
+      }
+    }
+
     // Warn about unknown params being silently ignored
     const knownParams = new Set(Object.keys(schema.params));
-    const unknown = Object.keys(params).filter(k => !knownParams.has(k));
+    const unknown = Object.keys(params).filter(k => !knownParams.has(k) && !SHARED_OPTIONAL_PARAMS.has(k));
     if (unknown.length > 0) {
       warnings.push(`Unknown params will be ignored: ${unknown.join(', ')}`);
     }
@@ -347,7 +367,7 @@ app.get('/api/data/:symbol', async (req, res) => {
  *
  * Request body:
  * {
- *   "symbol":       "AAPL",
+ *   "symbol":       "RELIANCE",
  *   "strategyType": "MOVING_AVERAGE_CROSSOVER",
  *   "params": {
  *     "shortPeriod":    50,
@@ -443,6 +463,89 @@ app.post('/api/backtest', async (req, res) => {
       message: error.message,
       stack:   process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+/**
+ * POST /api/monte-carlo
+ * Run a strategy across N random seeds and return distribution of outcomes.
+ * Same payload as /api/backtest, plus optional "runs" (default 30, max 100).
+ */
+app.post('/api/monte-carlo', async (req, res) => {
+  try {
+    const startTime = Date.now();
+    const { errors } = validateBacktest(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', details: errors });
+    }
+
+    const { symbol, strategyType, params, startDate, endDate } = req.body;
+    const runs = Math.min(Math.max(parseInt(req.body.runs) || 30, 5), 100);
+    const ticker = symbol.trim().toUpperCase();
+
+    const query = { symbol: ticker };
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate)   query.date.$lte = new Date(endDate);
+    }
+
+    const historicalData = await MarketData.find(query).sort({ date: 1 }).lean();
+    if (historicalData.length === 0) {
+      return res.status(404).json({ error: 'NO_DATA', message: `No data for '${ticker}'` });
+    }
+
+    const schema = STRATEGY_SCHEMAS[strategyType];
+    if (historicalData.length < schema.minCandles(params)) {
+      return res.status(422).json({ error: 'INSUFFICIENT_DATA' });
+    }
+
+    // Run across multiple seeds
+    const results = [];
+    for (let i = 0; i < runs; i++) {
+      const seedParams = { ...params, seed: 1000 + i };
+      const engine = new SimulationEngine(historicalData, params.initialCapital, { strategyType, params: seedParams });
+      const report = await engine.run();
+      results.push({
+        seed: seedParams.seed,
+        totalReturn: report.metrics.totalReturn,
+        maxDrawdown: report.metrics.maxDrawdown,
+        winRate: report.metrics.winRate,
+        sharpeRatio: report.metrics.sharpeRatio,
+        totalTrades: report.metrics.totalTrades,
+        cagr: report.metrics.cagr,
+        alpha: report.metrics.alpha,
+      });
+    }
+
+    // Calculate distribution stats
+    const returns = results.map(r => r.totalReturn);
+    const sorted = [...returns].sort((a, b) => a - b);
+    const mean = returns.reduce((s, v) => s + v, 0) / returns.length;
+    const variance = returns.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / returns.length;
+
+    const distribution = {
+      mean: Math.round(mean * 100) / 100,
+      median: sorted[Math.floor(sorted.length / 2)],
+      stdDev: Math.round(Math.sqrt(variance) * 100) / 100,
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+      percentile5: sorted[Math.floor(sorted.length * 0.05)],
+      percentile25: sorted[Math.floor(sorted.length * 0.25)],
+      percentile75: sorted[Math.floor(sorted.length * 0.75)],
+      percentile95: sorted[Math.floor(sorted.length * 0.95)],
+      positiveRuns: returns.filter(r => r > 0).length,
+      totalRuns: runs,
+    };
+
+    res.json({
+      distribution,
+      runs: results,
+      executionTimeMs: Date.now() - startTime,
+    });
+  } catch (error) {
+    console.error('Monte Carlo error:', error);
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message });
   }
 });
 

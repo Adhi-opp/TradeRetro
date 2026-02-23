@@ -4,7 +4,9 @@ import {
   BarChart3,
   Activity,
   Target,
-  DollarSign,
+  IndianRupee,
+  Gauge,
+  Zap,
 } from 'lucide-react';
 
 const ICON_MAP = {
@@ -13,7 +15,11 @@ const ICON_MAP = {
   'Max Drawdown': TrendingDown,
   'Sharpe Ratio': Activity,
   'Win Rate': Target,
-  'Net Profit': DollarSign,
+  'Net Profit': IndianRupee,
+  'Strategy CAGR': TrendingUp,
+  'Benchmark CAGR': BarChart3,
+  'Alpha': Zap,
+  'Info Ratio': Gauge,
 };
 
 export default function MetricsCard({ label, value, format }) {
@@ -23,17 +29,18 @@ export default function MetricsCard({ label, value, format }) {
   if (format === 'percent') {
     display = `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
   } else if (format === 'currency') {
-    display = `${num >= 0 ? '+' : ''}$${Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (num < 0) display = `-$${Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    display = `${num >= 0 ? '+' : ''}₹${Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (num < 0) display = `-₹${Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   } else {
     display = num.toFixed(2);
   }
 
   // Color logic: drawdown is always negative but "less negative = better", so we keep it red
+  const neutralLabels = new Set(['Win Rate', 'Sharpe Ratio', 'Info Ratio', 'Benchmark CAGR']);
   const colorClass =
     label === 'Max Drawdown'
       ? 'negative'
-      : label === 'Win Rate' || label === 'Sharpe Ratio'
+      : neutralLabels.has(label)
         ? 'neutral'
         : num >= 0
           ? 'positive'

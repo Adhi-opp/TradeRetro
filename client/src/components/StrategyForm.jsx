@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Shuffle } from 'lucide-react';
 
 const STRATEGIES = [
   { value: 'MOVING_AVERAGE_CROSSOVER', label: 'Moving Average Crossover' },
@@ -7,25 +7,33 @@ const STRATEGIES = [
   { value: 'MACD', label: 'MACD' },
 ];
 
-const STOCKS = {
-  nse: [
-    { value: 'RELIANCE',   label: 'Reliance Industries' },
-    { value: 'TCS',        label: 'Tata Consultancy Services' },
-    { value: 'HDFCBANK',   label: 'HDFC Bank' },
-    { value: 'INFY',       label: 'Infosys' },
-    { value: 'ICICIBANK',  label: 'ICICI Bank' },
-    { value: 'SBIN',       label: 'State Bank of India' },
-    { value: 'HINDUNILVR', label: 'Hindustan Unilever' },
-    { value: 'BAJFINANCE', label: 'Bajaj Finance' },
-    { value: 'BHARTIARTL', label: 'Bharti Airtel' },
-    { value: 'WIPRO',      label: 'Wipro' },
-  ],
-  us: [
-    { value: 'AAPL', label: 'Apple Inc.' },
-  ],
-};
+const STOCKS = [
+  // Banking
+  { value: 'HDFCBANK',   label: 'HDFC Bank',               sector: 'Banking' },
+  { value: 'ICICIBANK',  label: 'ICICI Bank',              sector: 'Banking' },
+  { value: 'SBIN',       label: 'State Bank of India',     sector: 'Banking' },
+  { value: 'AXISBANK',   label: 'Axis Bank',               sector: 'Banking' },
+  // IT
+  { value: 'TCS',        label: 'Tata Consultancy Services', sector: 'IT' },
+  { value: 'INFY',       label: 'Infosys',                 sector: 'IT' },
+  { value: 'WIPRO',      label: 'Wipro',                   sector: 'IT' },
+  { value: 'HCLTECH',    label: 'HCL Technologies',        sector: 'IT' },
+  // Energy
+  { value: 'RELIANCE',   label: 'Reliance Industries',     sector: 'Energy' },
+  { value: 'ONGC',       label: 'Oil & Natural Gas Corp',  sector: 'Energy' },
+  // FMCG
+  { value: 'HINDUNILVR', label: 'Hindustan Unilever',      sector: 'FMCG' },
+  { value: 'ITC',        label: 'ITC Limited',             sector: 'FMCG' },
+  // Finance
+  { value: 'BAJFINANCE', label: 'Bajaj Finance',           sector: 'Finance' },
+  // Telecom
+  { value: 'BHARTIARTL', label: 'Bharti Airtel',           sector: 'Telecom' },
+  // Index
+  { value: 'NIFTY50',    label: 'Nifty 50 Index',          sector: 'Index' },
+  { value: 'BANKNIFTY',  label: 'Bank Nifty Index',        sector: 'Index' },
+];
 
-export default function StrategyForm({ onRunBacktest, isLoading }) {
+export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading }) {
   const [ticker, setTicker] = useState('RELIANCE');
   const [strategyType, setStrategyType] = useState('MOVING_AVERAGE_CROSSOVER');
   const [fastSma, setFastSma] = useState(50);
@@ -33,22 +41,30 @@ export default function StrategyForm({ onRunBacktest, isLoading }) {
   const [rsiPeriod, setRsiPeriod] = useState(14);
   const [oversold, setOversold] = useState(30);
   const [overbought, setOverbought] = useState(70);
+  const [initialCapital, setInitialCapital] = useState(100000);
   const [startDate, setStartDate] = useState('2020-01-01');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const getFormParams = () => ({
+    ticker: ticker.toUpperCase(),
+    strategyType,
+    initialCapital: Number(initialCapital),
+    fastSma: Number(fastSma),
+    slowSma: Number(slowSma),
+    rsiPeriod: Number(rsiPeriod),
+    oversold: Number(oversold),
+    overbought: Number(overbought),
+    startDate,
+    endDate,
+  });
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onRunBacktest({
-      ticker: ticker.toUpperCase(),
-      strategyType,
-      fastSma: Number(fastSma),
-      slowSma: Number(slowSma),
-      rsiPeriod: Number(rsiPeriod),
-      oversold: Number(oversold),
-      overbought: Number(overbought),
-      startDate,
-      endDate,
-    });
+    onRunBacktest(getFormParams());
+  };
+
+  const handleMonteCarlo = () => {
+    if (onRunMonteCarlo) onRunMonteCarlo(getFormParams());
   };
 
   return (
@@ -64,16 +80,13 @@ export default function StrategyForm({ onRunBacktest, isLoading }) {
             onChange={(e) => setTicker(e.target.value)}
             disabled={isLoading}
           >
-            <optgroup label="NSE (India)">
-              {STOCKS.nse.map((s) => (
-                <option key={s.value} value={s.value}>{s.value} — {s.label}</option>
-              ))}
-            </optgroup>
-            <optgroup label="US Market">
-              {STOCKS.us.map((s) => (
-                <option key={s.value} value={s.value}>{s.value} — {s.label}</option>
-              ))}
-            </optgroup>
+            {[...new Set(STOCKS.map((s) => s.sector))].map((sector) => (
+              <optgroup key={sector} label={sector}>
+                {STOCKS.filter((s) => s.sector === sector).map((s) => (
+                  <option key={s.value} value={s.value}>{s.value} — {s.label}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </div>
 
@@ -89,6 +102,21 @@ export default function StrategyForm({ onRunBacktest, isLoading }) {
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="initialCapital">Initial Capital (₹)</label>
+          <input
+            id="initialCapital"
+            type="number"
+            value={initialCapital}
+            onChange={(e) => setInitialCapital(e.target.value)}
+            disabled={isLoading}
+            required
+            min="1000"
+            max="100000000"
+            step="1000"
+          />
         </div>
 
         {strategyType === 'MOVING_AVERAGE_CROSSOVER' && (
@@ -206,6 +234,10 @@ export default function StrategyForm({ onRunBacktest, isLoading }) {
                 Run Backtest
               </>
             )}
+          </button>
+          <button type="button" className="btn-monte-carlo" disabled={isLoading} onClick={handleMonteCarlo}>
+            <Shuffle size={15} />
+            Monte Carlo
           </button>
         </div>
       </div>

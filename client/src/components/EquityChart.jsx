@@ -14,7 +14,7 @@ function CustomTooltip({ active, payload, label }) {
   if (!active || !payload || !payload.length) return null;
 
   const date = new Date(label);
-  const formatted = date.toLocaleDateString('en-US', {
+  const formatted = date.toLocaleDateString('en-IN', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -25,8 +25,8 @@ function CustomTooltip({ active, payload, label }) {
       <div className="date">{formatted}</div>
       {payload.map((entry) => (
         <div key={entry.dataKey} style={{ color: entry.color, marginTop: 2 }}>
-          {entry.name}: $
-          {Number(entry.value).toLocaleString(undefined, {
+          {entry.name}: ₹
+          {Number(entry.value).toLocaleString('en-IN', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}
@@ -42,19 +42,22 @@ const formatXAxis = (tick) => {
 };
 
 const formatYAxis = (val) =>
-  `$${Number(val).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
-export default function EquityChart({ data }) {
+export default function EquityChart({ data, showCosts = true }) {
   if (!data || data.length === 0) return null;
+
+  const equityKey = showCosts ? 'equity' : 'grossEquity';
 
   const chartData = useMemo(() => {
     const initialPrice = data[0].price;
-    const initialEquity = data[0].equity;
+    const initialEquity = data[0][equityKey] || data[0].equity;
     return data.map((d) => ({
       ...d,
+      displayEquity: d[equityKey] || d.equity,
       buyHold: (d.price / initialPrice) * initialEquity,
     }));
-  }, [data]);
+  }, [data, equityKey]);
 
   return (
     <div className="panel">
@@ -87,9 +90,9 @@ export default function EquityChart({ data }) {
               wrapperStyle={{ fontSize: 12 }}
             />
             <Line
-              name="Strategy"
+              name={showCosts ? 'Strategy (Net)' : 'Strategy (Gross)'}
               type="monotone"
-              dataKey="equity"
+              dataKey="displayEquity"
               stroke="#22c55e"
               strokeWidth={2}
               dot={false}

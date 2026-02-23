@@ -15,12 +15,12 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
           Institutional Backtester & AI Truth Engine
         </p>
         <p className="landing-desc">
-          Testing LLM hallucination against real Indian STT, slippage, and historical NSE data.
+          Testing LLM hallucination against real Indian STT, slippage, and synthetic Markov Regime-Switching market data.
         </p>
         <button className="landing-btn" onClick={onEnter}>
           Launch Terminal
         </button>
-        <div className="landing-version">v0.1 — sandbox</div>
+        <div className="landing-version">v0.2 — sandbox</div>
       </div>
     </div>
   );

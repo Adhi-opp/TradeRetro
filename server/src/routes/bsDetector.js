@@ -117,8 +117,12 @@ router.get('/bs-detector/stocks', async (req, res) => {
 
     return res.json({
       available_stocks: [
-        'RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK',
-        'HINDUNILVR', 'SBIN', 'BAJFINANCE', 'BHARTIARTL', 'WIPRO'
+        'HDFCBANK', 'ICICIBANK', 'SBIN', 'AXISBANK',
+        'TCS', 'INFY', 'WIPRO', 'HCLTECH',
+        'RELIANCE', 'ONGC',
+        'HINDUNILVR', 'ITC',
+        'BAJFINANCE', 'BHARTIARTL',
+        'NIFTY50', 'BANKNIFTY'
       ],
       note: 'Run fetch_nse_data.py to refresh data'
     });

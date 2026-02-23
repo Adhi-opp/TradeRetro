@@ -6,15 +6,15 @@ export default function LeftPane({
   mode,
   onSwitchMode,
   onRunBacktest,
+  onRunMonteCarlo,
   onVerify,
   loading,
   error,
-  collapsed,
 }) {
   const isManual = mode === 'manual';
 
   return (
-    <div className={'left-pane' + (collapsed ? ' left-pane-collapsed' : '')}>
+    <div className="left-pane">
       <div className="left-pane-header">
         <span className="left-pane-label">Control Center</span>
         {loading && (
@@ -51,7 +51,7 @@ export default function LeftPane({
 
         {/* Form */}
         {isManual ? (
-          <StrategyForm onRunBacktest={onRunBacktest} isLoading={loading} />
+          <StrategyForm onRunBacktest={onRunBacktest} onRunMonteCarlo={onRunMonteCarlo} isLoading={loading} />
         ) : (
           <AiVerifyForm onVerify={onVerify} isLoading={loading} />
         )}
