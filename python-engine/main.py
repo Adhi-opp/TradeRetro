@@ -14,15 +14,18 @@ from fastapi.responses import JSONResponse
 
 from config import settings
 from services.db import init_pool, close_pool
-from routers import backtest, bs_detector, signals, health
+from services.redis_client import init_redis, close_redis
+from routers import backtest, bs_detector, signals, health, auth
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize connection pool
+    # Startup: initialize connection pool and Redis
     await init_pool(settings.database_url)
+    await init_redis()
     yield
-    # Shutdown: close pool
+    # Shutdown: close connections
+    await close_redis()
     await close_pool()
 
 
@@ -44,6 +47,7 @@ app.include_router(health.router)
 app.include_router(backtest.router)
 app.include_router(bs_detector.router)
 app.include_router(signals.router)
+app.include_router(auth.router)
 
 
 # ── Exception Handlers ────────────────────────────────────────
