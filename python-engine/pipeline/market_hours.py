@@ -1,19 +1,31 @@
 """
 NSE market hours and holiday calendar.
 Used by the pipeline to decide when to connect/disconnect the WebSocket.
+
+NSE sessions (IST):
+    Pre-open:   09:00 - 09:15
+    Normal:     09:15 - 15:30
+    Closing:    15:30 - 15:40
+    Post-close: 15:40 - 16:00 (order matching, no new orders)
+
+For tick capture, we stream from 09:00 through 15:40 to catch
+pre-open auction and closing session data.
 """
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 IST = ZoneInfo("Asia/Kolkata")
 
+# Tick capture window — wider than normal trading hours
+STREAM_START = time(9, 0)    # Pre-open session start
+STREAM_END = time(15, 40)    # Closing session end
+
+# Normal market hours (for reference / UI display)
 MARKET_OPEN = time(9, 15)
 MARKET_CLOSE = time(15, 30)
-PRE_OPEN_START = time(9, 0)
 
 # NSE holidays 2026 — update annually from NSE circular.
-# Source: typical NSE holiday schedule (verify against official list).
 NSE_HOLIDAYS_2026: set[date] = {
     date(2026, 1, 26),   # Republic Day
     date(2026, 3, 10),   # Maha Shivaratri
@@ -49,45 +61,52 @@ def is_trading_day(d: date | None = None) -> bool:
     return d not in NSE_HOLIDAYS_2026
 
 
+def is_stream_window() -> bool:
+    """True if we should be streaming ticks (9:00 - 15:40 on trading days)."""
+    now = now_ist()
+    if not is_trading_day(now.date()):
+        return False
+    return STREAM_START <= now.time() <= STREAM_END
+
+
 def is_market_open() -> bool:
+    """True during normal trading hours (9:15 - 15:30)."""
     now = now_ist()
     if not is_trading_day(now.date()):
         return False
     return MARKET_OPEN <= now.time() <= MARKET_CLOSE
 
 
-def seconds_until_market_open() -> float:
-    """Seconds until next market open. Returns 0 if market is currently open."""
+def seconds_until_stream_start() -> float:
+    """Seconds until next stream window opens. Returns 0 if currently in window."""
     now = now_ist()
-    if is_market_open():
+    if is_stream_window():
         return 0.0
 
-    # Walk forward day-by-day to find the next trading day
     target = now.date()
-    for _ in range(10):
-        if now.time() > MARKET_CLOSE or not is_trading_day(target):
-            target = _next_weekday(target)
-        if is_trading_day(target):
-            break
-        target = _next_weekday(target)
+    # If past today's window or not a trading day, find the next one
+    if now.time() > STREAM_END or not is_trading_day(target):
+        target = _next_trading_day(target)
+    elif now.time() < STREAM_START and is_trading_day(target):
+        pass  # Same day, just wait for 9:00
+    else:
+        target = _next_trading_day(target)
 
-    market_open_dt = datetime.combine(target, MARKET_OPEN, tzinfo=IST)
-    delta = (market_open_dt - now).total_seconds()
-    return max(delta, 0.0)
+    open_dt = datetime.combine(target, STREAM_START, tzinfo=IST)
+    return max((open_dt - now).total_seconds(), 0.0)
 
 
-def seconds_until_market_close() -> float:
-    """Seconds until today's market close. Returns 0 if market is already closed."""
+def seconds_until_stream_end() -> float:
+    """Seconds until today's stream window closes. Returns 0 if already closed."""
     now = now_ist()
-    if not is_market_open():
+    if not is_stream_window():
         return 0.0
-    close_dt = datetime.combine(now.date(), MARKET_CLOSE, tzinfo=IST)
+    close_dt = datetime.combine(now.date(), STREAM_END, tzinfo=IST)
     return max((close_dt - now).total_seconds(), 0.0)
 
 
-def _next_weekday(d: date) -> date:
-    from datetime import timedelta
+def _next_trading_day(d: date) -> date:
     d = d + timedelta(days=1)
-    while d.weekday() >= 5:
+    while d.weekday() >= 5 or d in NSE_HOLIDAYS_2026:
         d += timedelta(days=1)
     return d

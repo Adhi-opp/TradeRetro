@@ -33,7 +33,9 @@ services:
     build:
       context: ./python-engine
       dockerfile: Dockerfile
+    env_file: .env
     environment:
+      # Override DB/Redis URLs for Docker networking (takes precedence over .env)
       DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/traderetro_raw
       REDIS_URL: redis://redis:6379
     ports:
@@ -49,11 +51,11 @@ services:
     build:
       context: ./python-engine
       dockerfile: Dockerfile
+    env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/traderetro_raw
       REDIS_URL: redis://redis:6379
-      PIPELINE_MODE: simulate
-      SIMULATE_RATE: "10"
+      PIPELINE_MODE: live
     command: ["python", "-m", "pipeline.worker"]
     depends_on:
       timescaledb:
