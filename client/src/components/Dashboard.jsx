@@ -3,7 +3,7 @@ import { Sun, Moon } from 'lucide-react';
 import LeftPane from './LeftPane';
 import RightPane from './RightPane';
 
-const TIMEOUT_MS = 15000;       // 15s for backtest & monte carlo
+const TIMEOUT_MS = 30000;       // 30s for backtest & monte carlo
 const VERIFY_TIMEOUT_MS = 30000; // 30s for AI verify (Python execution)
 
 function fetchWithTimeout(url, options, timeoutMs) {
@@ -20,6 +20,19 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [applyCosts, setApplyCosts] = useState(false);
+  const [backtestTicker, setBacktestTicker] = useState(null);
+  const [strategyParams, setStrategyParams] = useState(null);
+  const [backtestRange, setBacktestRange] = useState(null);
+
+  const getErrorMessage = (data, fallback) => {
+    if (!data) return fallback;
+    if (typeof data === 'string') return data;
+    if (data.message) return data.message;
+    if (data.error && typeof data.error === 'string') return data.error;
+    if (typeof data.detail === 'string') return data.detail;
+    if (data.detail?.message) return data.detail.message;
+    return fallback;
+  };
 
   const buildParams = (formParams) => {
     const capital = formParams.initialCapital || 100000;
@@ -58,14 +71,24 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
     };
 
     try {
-      const response = await fetchWithTimeout('http://localhost:5000/api/backtest', {
+      const response = await fetchWithTimeout('http://localhost:8000/api/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }, TIMEOUT_MS);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || data.error || 'Backend rejected request');
+      if (!response.ok) throw new Error(getErrorMessage(data, 'Backend rejected request'));
       setResult(data);
+      setBacktestTicker(formParams.ticker.toUpperCase());
+      setBacktestRange({
+        startDate: formParams.startDate,
+        endDate: formParams.endDate,
+      });
+      setStrategyParams({
+        strategyType: formParams.strategyType,
+        fastSma: formParams.fastSma,
+        slowSma: formParams.slowSma,
+      });
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out — server took too long to respond');
@@ -93,14 +116,19 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
     };
 
     try {
-      const response = await fetchWithTimeout('http://localhost:5000/api/monte-carlo', {
+      const response = await fetchWithTimeout('http://localhost:8000/api/monte-carlo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }, TIMEOUT_MS);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || data.error || 'Monte Carlo failed');
+      if (!response.ok) throw new Error(getErrorMessage(data, 'Monte Carlo failed'));
       setMonteCarloResult(data);
+      setBacktestTicker(formParams.ticker.toUpperCase());
+      setBacktestRange({
+        startDate: formParams.startDate,
+        endDate: formParams.endDate,
+      });
     } catch (err) {
       if (err.name === 'AbortError') {
         setError('Request timed out — Monte Carlo took too long');
@@ -118,17 +146,17 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
     setVerdictResult(null);
 
     try {
-      const response = await fetchWithTimeout('http://localhost:5000/api/verify-ai-strategy', {
+      const response = await fetchWithTimeout('http://localhost:8000/api/verify-strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }, VERIFY_TIMEOUT_MS);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || data.detail || 'Verification failed');
+      if (!response.ok) throw new Error(getErrorMessage(data, 'Verification failed'));
       setVerdictResult(data);
     } catch (err) {
       if (err.name === 'AbortError') {
-        setError('AI verification timed out — code may contain infinite loops or invalid syntax');
+        setError('AI verification timed out — code may be too complex, invalid, or stuck in a long-running branch');
       } else {
         setError(err.message || 'Failed to connect to BS Detector service');
       }
@@ -185,7 +213,12 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           verdictResult={verdictResult}
           monteCarloResult={monteCarloResult}
           loading={loading}
+          error={error}
           applyCosts={applyCosts}
+          theme={theme}
+          backtestTicker={backtestTicker}
+          strategyParams={strategyParams}
+          backtestRange={backtestRange}
         />
       </div>
     </div>

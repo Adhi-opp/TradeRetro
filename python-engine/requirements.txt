@@ -1,0 +1,22 @@
+# API
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+pydantic>=2.10,<3
+pydantic-settings>=2.0,<3
+
+# Database
+asyncpg>=0.30,<1
+
+# Data
+pandas>=2.2,<3
+numpy>=1.26,<2
+
+# Pipeline (Phase 1+)
+redis>=5.0,<6
+
+# Data sources (historical backfill)
+yfinance>=0.2.54,<1
+
+# Testing
+pytest>=8.0,<9
+httpx>=0.27,<1

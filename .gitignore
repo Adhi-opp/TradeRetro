@@ -2,10 +2,13 @@
 node_modules/
 dist/
 build/
+
+# Environment
 .env
 
 # Python
 venv/
+.venv*/
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -13,6 +16,11 @@ __pycache__/
 # OS Files
 .DS_Store
 
-# Data (Forces team to fetch their own local data)
-bs_detector/nse_data/*.csv
-bs_detector/nse_data/*.json
+# Logs
+*.log
+
+# Docker volumes
+pgdata/
+
+# yfinance cache
+.yfinance-cache/

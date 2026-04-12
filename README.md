@@ -1,197 +1,178 @@
 # TradeRetro
 
-**Institutional-grade backtesting engine with an AI Truth Detector that exposes LLM hallucinations in trading strategies.**
-
-TradeRetro lets you backtest classic technical strategies (SMA Crossover, RSI, MACD) against real historical data across US and Indian markets, and separately verify whether AI-generated trading strategies actually deliver what they claim.
-
----
+A full-stack trading strategy backtester with a Python data engineering pipeline, built to demonstrate production-grade data practices on real NSE market data.
 
 ## Architecture
 
 ```
-TradeRetro/
-├── client/          React 19 + Vite frontend (Progressive Terminal UI)
-├── server/          Express 5 + MongoDB backend (Backtest Engine)
-└── bs_detector/     FastAPI microservice (AI BS Detector)
+                          +------------------+
+                          |  Yahoo Finance   |
+                          +--------+---------+
+                                   |
+                    +--------------v---------------+
+                    |   python-quant-engine        |
+                    |   (Ingestion Pipeline)       |
+                    |                              |
+                    |  Watermark CDC               |
+                    |  Data Quality Gate           |
+                    |  Structured Logging          |
+                    +--------------+---------------+
+                                   |
+                    +--------------v---------------+
+                    |        PostgreSQL             |
+                    |                              |
+                    |  raw.historical_prices       |  Bronze
+                    |  analytics.daily_signals     |  Gold
+                    |  ops.data_catalog            |  Control Plane
+                    |  ops.ingestion_log           |  Audit Trail
+                    +---------+----+----+----------+
+                              |    |    |
+              +---------------+    |    +----------------+
+              |                    |                     |
+    +---------v-------+  +---------v--------+  +---------v--------+
+    | python-backtest  |  |   bs_detector    |  |  Express Gateway |
+    | engine (:8001)   |  |   (:8000)        |  |  (:5000)         |
+    +--------+---------+  +---------+--------+  +---------+--------+
+              |                    |                      |
+              +--------------------+----------------------+
+                                   |
+                    +--------------v---------------+
+                    |     React Frontend (:5173)   |
+                    +------------------------------+
 ```
 
-**Three independent services:**
+## Data Engineering Concepts Demonstrated
 
-| Service | Port | Stack | Purpose |
-|---------|------|-------|---------|
-| Frontend | 5173 | React 19, Vite 7, Recharts | Progressive Terminal UI with split-pane IDE layout |
-| Backend | 5000 | Express 5, Mongoose 9, MongoDB | Backtest engine, data ingestion, API layer |
-| BS Detector | 8000 | FastAPI, Pandas, NumPy | AI strategy verification & truth scoring |
+| Concept | Implementation |
+|---------|---------------|
+| **Medallion Architecture** | `raw` (Bronze) -> `analytics` (Gold) schema separation |
+| **Watermark-based CDC** | `ops.data_catalog.high_watermark` drives incremental loads |
+| **Idempotent Upserts** | `ON CONFLICT DO NOTHING` / `DO UPDATE` prevents duplicates |
+| **Data Quality Gates** | `quality.py` validates OHLCV invariants before signal compute |
+| **Audit Logging** | `ops.ingestion_log` tracks every pipeline run with status/timing |
+| **Schema Migrations** | Version-controlled SQL in `migrations/` (000, 001, 002) |
+| **Structured Logging** | Python `logging` module replaces print() for observability |
+| **Containerization** | `docker-compose.yml` orchestrates all 5 services + Postgres |
+| **Integration Testing** | `pytest` end-to-end tests validate the full pipeline |
 
----
+## Database Schemas
 
-## Features
-
-### Manual Backtesting
-- **3 strategies:** Moving Average Crossover (Golden/Death Cross), RSI (Oversold/Overbought), MACD (Histogram Crossover)
-- **11 stocks:** 10 NSE (RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK, SBIN, HINDUNILVR, BAJFINANCE, BHARTIARTL, WIPRO) + AAPL
-- **Full metrics:** Total Return, Buy & Hold comparison, Max Drawdown, Sharpe Ratio, Win Rate, Net Profit
-- **Equity curve:** Interactive Recharts line chart — Strategy vs Buy & Hold benchmark
-- **Trade ledger:** Entry/Exit dates, shares, P&L per trade with color-coded returns
-
-### AI Verification (BS Detector)
-- Paste any Python entry/exit logic an AI gave you
-- Enter the AI's claimed Win Rate and Return %
-- The engine runs the strategy against real data and produces a **Truth Score (0-100)**
-- Verdicts: **LEGIT** / **EXAGGERATED** / **MISLEADING** / **BS**
-- Claims vs Reality comparison table
-
-### Progressive Terminal UI
-- **Landing page gatekeeper** — dark, minimal screen with "Launch Terminal" entry
-- **Split-pane IDE layout** — Left pane (35%) for controls, Right pane (65%) for results
-- **Lock-on-execute** — Control panel locks with overlay during strategy execution
-- **Smooth collapse** — Animated slide transition for panel toggle
-- **Light/Dark theme** — Toggle with localStorage persistence
-- **Clickable logo** — Returns to landing page from anywhere
-
----
+```
+raw.historical_prices      -- Bronze: OHLCV landing zone from Yahoo Finance
+analytics.daily_signals    -- Gold: SMA-20/50/200, daily returns
+ops.data_catalog           -- Watermark state per ticker
+ops.ingestion_log          -- Audit trail: run_id, timing, row counts, status
+```
 
 ## Quick Start
 
-### Prerequisites
-- **Node.js** >= 18
-- **MongoDB** running locally on port 27017
-- **Python** >= 3.9
-
-### 1. Clone & Install
+### With Docker
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/TradeRetro.git
-cd TradeRetro
-
-# Server
-cd server
-npm install
-
-# Client
-cd ../client
-npm install
-
-# BS Detector
-cd ../bs_detector
-pip install -r requirements.txt
+docker compose up -d postgres
+docker compose run ingestion --symbol RELIANCE.NS
+docker compose up -d
 ```
 
-### 2. Configure Environment
-
-Create `server/.env`:
-```
-MONGODB_URI=mongodb://localhost:27017/traderetro
-PORT=5000
-NODE_ENV=development
-```
-
-### 3. Ingest Stock Data
+### Without Docker
 
 ```bash
-cd server
-npm run ingest
+# 1. Start PostgreSQL and run migrations
+cd python-quant-engine
+PGPASSWORD=postgres bash migrations/run_migrations.sh
+
+# 2. Ingest data
+python -m src.ingestion.fetch_ohlcv --symbol RELIANCE.NS
+
+# 3. Start services
+cd ../python-backtest-engine && uvicorn main:app --port 8001 &
+cd ../bs_detector && uvicorn bs_api:app --port 8000 &
+cd ../server && npm start &
+cd ../client && npm run dev
 ```
 
-This batch-ingests all 11 CSV files from `server/data/` into MongoDB. The script auto-detects CSV format (Investing.com for AAPL, yfinance format for NSE stocks).
+## Ingestion Pipeline
 
-### 4. Start All Services
+```
+fetch_ohlcv.py
+  |
+  +-- get_watermark()         Check ops.data_catalog for last loaded date
+  |
+  +-- stream_ohlcv()          Fetch from Yahoo Finance (full or incremental)
+  |
+  +-- load_to_postgres()      Upsert into raw.historical_prices
+  |                           Returns (rows_fetched, rows_inserted)
+  |
+  +-- run_quality_checks()    Validate OHLCV invariants (hard/soft checks)
+  |
+  +-- compute_and_store_signals()   SMA + daily returns -> analytics layer
+  |
+  +-- Update ops.ingestion_log + ops.data_catalog
+```
+
+### Pipeline CLI
 
 ```bash
-# Terminal 1 — Backend
-cd server
-npm run dev
+# Default: incremental load using watermark
+python -m src.ingestion.fetch_ohlcv --symbol RELIANCE.NS
 
-# Terminal 2 — BS Detector
-cd bs_detector
-uvicorn bs_api:app --reload --port 8000
+# Force full reload
+python -m src.ingestion.fetch_ohlcv --symbol RELIANCE.NS --period 10y
 
-# Terminal 3 — Frontend
-cd client
-npm run dev
+# Multiple tickers
+python -m src.ingestion.fetch_ohlcv --symbol RELIANCE.NS --symbol TCS.NS --symbol INFY.NS
+
+# Date range override
+python -m src.ingestion.fetch_ohlcv --symbol RELIANCE.NS --start-date 2024-01-01 --end-date 2024-12-31
 ```
 
-Open **http://localhost:5173** in your browser.
+## Running Tests
 
----
+```bash
+cd python-quant-engine
+pip install pytest
+PGPASSWORD=postgres python -m pytest tests/ -v
+```
 
-## API Endpoints
-
-### Backend (Port 5000)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/backtest` | Run a strategy backtest |
-| GET | `/api/data/:symbol` | Get historical data for a symbol |
-| GET | `/api/assets` | List all available symbols in DB |
-| POST | `/api/verify-ai-strategy` | Proxy to BS Detector microservice |
-| GET | `/api/bs-detector/stocks` | List stocks available for AI verification |
-
-### BS Detector (Port 8000)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/verify` | Verify AI strategy claims against real data |
-| GET | `/health` | Health check + available stock list |
-
----
+```bash
+cd python-backtest-engine
+python -m pytest tests/ -v
+```
 
 ## Project Structure
 
 ```
-client/src/
-├── App.jsx                 Landing gate (hasEntered state + theme)
-├── index.css               Full design system (dark/light themes)
-└── components/
-    ├── Landing.jsx          Gatekeeper screen
-    ├── Dashboard.jsx        Split-pane IDE shell + all state/API logic
-    ├── LeftPane.jsx         Control center (mode toggle, forms, lock overlay)
-    ├── RightPane.jsx        Output monitor (idle, loading, results)
-    ├── StrategyForm.jsx     Manual backtest form (stock dropdown, params)
-    ├── AiVerifyForm.jsx     AI verification form (code input, claims)
-    ├── MetricsCard.jsx      Individual metric display card
-    ├── EquityChart.jsx      Recharts equity curve (Strategy vs Buy & Hold)
-    ├── TradeTable.jsx       Trade ledger table
-    └── VerdictCard.jsx      AI verdict display (truth score, comparisons)
+TradeRetro/
+  python-quant-engine/          Data engineering pipeline
+    migrations/                 Version-controlled SQL DDL
+      000_create_raw_schema.sql
+      001_create_ops_schema.sql
+      002_create_analytics_schema.sql
+    src/ingestion/
+      fetch_ohlcv.py            Main pipeline: fetch, load, validate, transform
+      quality.py                Data quality gate (hard/soft checks)
+    tests/
+      test_pipeline_integration.py
 
-server/src/
-├── index.js                Express server + routes + MarketData model
-├── engine/
-│   └── SimulationEngine.js  Strategy execution (SMA, RSI, MACD)
-├── routes/
-│   └── bsDetector.js        Proxy to Python microservice
-├── scripts/
-│   ├── ingestData.js         Batch CSV ingestion (auto-format detection)
-│   └── fetchAndSave.js       Yahoo Finance live fetcher
+  python-backtest-engine/       Vectorized backtest engine (FastAPI)
+    engine/                     Simulation, costs, metrics, indicators
+    services/                   Data loader, Monte Carlo
+    models/                     Pydantic request/response schemas
+    tests/                      48 unit tests
 
-bs_detector/
-├── bs_api.py                FastAPI endpoints + truth scoring logic
-├── data/                    10 NSE stock CSVs (synthetic via GBM)
-│   └── fetch_nse_data.py    Data generation script
-└── requirements.txt
+  bs_detector/                  AI strategy verifier (FastAPI)
+    bs_api.py                   Sandboxed code execution + truth scoring
+
+  server/                       Express.js API gateway
+  client/                       React + TailwindCSS frontend
+  docker-compose.yml            Full-stack container orchestration
 ```
-
----
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, Vite 7, Recharts 3, Lucide Icons |
-| Backend | Express 5, Mongoose 9, MongoDB |
-| AI Engine | FastAPI, Pandas, NumPy |
-| Styling | Custom CSS design system (CSS variables, no framework) |
-| Fonts | Inter (sans), JetBrains Mono (mono) |
-
----
-
-## Available Stocks
-
-### NSE (India)
-RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK, SBIN, HINDUNILVR, BAJFINANCE, BHARTIARTL, WIPRO
-
-
-
-## License
-
-MIT
+- **Pipeline**: Python 3.12, psycopg2, pandas, yfinance
+- **Database**: PostgreSQL 16 (medallion architecture)
+- **Backend**: FastAPI (Python), Express.js (Node)
+- **Frontend**: React 19, Vite, TailwindCSS, Lightweight Charts
+- **Testing**: pytest, Jest
+- **Infra**: Docker Compose
