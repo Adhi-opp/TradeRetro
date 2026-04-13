@@ -38,12 +38,15 @@ services:
       # Override DB/Redis URLs for Docker networking (takes precedence over .env)
       DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/traderetro_raw
       REDIS_URL: redis://redis:6379
+      PREFECT_API_URL: http://prefect-server:4200/api
     ports:
       - "8000:8000"
     depends_on:
       timescaledb:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      prefect-server:
         condition: service_healthy
 
   # ── Pipeline Worker (Redis Streams consumer + tick producer) ─
@@ -56,12 +59,31 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/traderetro_raw
       REDIS_URL: redis://redis:6379
       PIPELINE_MODE: live
+      PREFECT_API_URL: http://prefect-server:4200/api
     command: ["python", "-m", "pipeline.worker"]
     depends_on:
       timescaledb:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # ── Prefect Server (orchestration UI + API) ──────────────────
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_SERVER_API_HOST: "0.0.0.0"
+      PREFECT_API_DATABASE_CONNECTION_URL: "sqlite+aiosqlite:////data/prefect.db"
+    volumes:
+      - prefect_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:4200/api/health').raise_for_status()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # ── React Frontend (Vite dev server) ────────────────────────
   client:
@@ -75,3 +97,4 @@ services:
 
 volumes:
   pgdata:
+  prefect_data:

@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from config import settings
 from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
-from routers import backtest, bs_detector, signals, health, auth
+from routers import backtest, bs_detector, signals, health, auth, ingestion
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ app.include_router(backtest.router)
 app.include_router(bs_detector.router)
 app.include_router(signals.router)
 app.include_router(auth.router)
+app.include_router(ingestion.router)
 
 
 # ── Exception Handlers ────────────────────────────────────────
