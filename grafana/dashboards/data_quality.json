@@ -1,0 +1,204 @@
+{
+  "uid": "data-quality",
+  "title": "Data Quality",
+  "tags": ["traderetro", "quality"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "5m",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Tickers with Stale Data (>3 days behind)",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Stale Tickers\" FROM ops.data_catalog WHERE high_watermark < CURRENT_DATE - INTERVAL '3 days'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Recent DQ Failures (7d)",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"DQ Failures\" FROM ops.ingestion_log WHERE started_at >= NOW() - INTERVAL '7 days' AND status = 'failed' AND error_message LIKE '%DQ%'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Historical Rows",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Total Rows\" FROM raw.historical_prices",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Data Completeness by Ticker",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT hp.ticker, COUNT(*) AS total_rows, MIN(hp.trade_date) AS first_date, MAX(hp.trade_date) AS last_date, CURRENT_DATE - MAX(hp.trade_date) AS days_behind, dc.high_watermark, dc.last_refreshed FROM raw.historical_prices hp LEFT JOIN ops.data_catalog dc ON hp.ticker = dc.ticker GROUP BY hp.ticker, dc.high_watermark, dc.last_refreshed ORDER BY days_behind DESC NULLS LAST",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "days_behind" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 2 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Gap Detection (Missing Trading Days)",
+      "description": "Shows date gaps in historical data excluding weekends",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "WITH ticker_gaps AS ( SELECT ticker, trade_date, LEAD(trade_date) OVER (PARTITION BY ticker ORDER BY trade_date) AS next_date, LEAD(trade_date) OVER (PARTITION BY ticker ORDER BY trade_date) - trade_date AS gap_days FROM raw.historical_prices ) SELECT ticker, trade_date AS gap_after, next_date AS resumes_on, gap_days FROM ticker_gaps WHERE gap_days > 3 ORDER BY gap_days DESC, trade_date DESC LIMIT 50",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "gap_days" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "yellow", "value": null },
+                    { "color": "orange", "value": 5 },
+                    { "color": "red", "value": 10 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Ingestion Failures Over Time",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 day', started_at) AS time, COUNT(*) FILTER (WHERE status = 'failed') AS \"Failures\", COUNT(*) FILTER (WHERE status = 'success') AS \"Successes\" FROM ops.ingestion_log WHERE started_at >= $__timeFrom() AND started_at <= $__timeTo() GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Failures" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Successes" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ],
+        "defaults": {
+          "custom": { "drawStyle": "bars", "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Data Volume by Ticker (rows per day)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT trade_date AS time, ticker, COUNT(*) AS rows FROM raw.historical_prices WHERE trade_date >= $__timeFrom()::date AND trade_date <= $__timeTo()::date GROUP BY trade_date, ticker ORDER BY trade_date",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Recent Failures (with error messages)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT run_id, ticker, load_type, started_at, finished_at, rows_fetched, error_message FROM ops.ingestion_log WHERE status = 'failed' AND started_at >= NOW() - INTERVAL '7 days' ORDER BY started_at DESC LIMIT 20",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

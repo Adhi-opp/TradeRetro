@@ -1,0 +1,174 @@
+{
+  "uid": "system-metrics",
+  "title": "System Metrics",
+  "tags": ["traderetro", "system"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Bronze Table Size",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT pg_size_pretty(hypertable_size('bronze.market_ticks')) AS \"Size\"",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Silver Table Size",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT pg_size_pretty(hypertable_size('silver.ohlcv_1min')) AS \"Size\"",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Historical Prices Size",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT pg_size_pretty(hypertable_size('raw.historical_prices')) AS \"Size\"",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Metrics Table Size",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT pg_size_pretty(hypertable_size('ops.pipeline_metrics')) AS \"Size\"",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Hypertable Chunk Details",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT hypertable_schema || '.' || hypertable_name AS hypertable, chunk_schema || '.' || chunk_name AS chunk, range_start, range_end, pg_size_pretty(total_bytes) AS chunk_size, total_bytes FROM timescaledb_information.chunks ORDER BY hypertable_name, range_start DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Pipeline Metrics Over Time",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('30 minutes', recorded_at) AS time, metric_name, SUM(metric_value) AS value FROM ops.pipeline_metrics WHERE recorded_at >= $__timeFrom() AND recorded_at <= $__timeTo() GROUP BY time, metric_name ORDER BY time",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Hypertable Summary",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT hypertable_schema || '.' || hypertable_name AS hypertable, num_chunks, pg_size_pretty(before_compression_total_bytes) AS total_size, pg_size_pretty(before_compression_table_bytes) AS table_size, pg_size_pretty(before_compression_index_bytes) AS index_size FROM timescaledb_information.hypertable_compression_stats UNION ALL SELECT ht.hypertable_schema || '.' || ht.hypertable_name AS hypertable, ht.num_chunks, pg_size_pretty(pg_total_relation_size(ht.hypertable_schema || '.' || ht.hypertable_name)) AS total_size, NULL AS table_size, NULL AS index_size FROM timescaledb_information.hypertables ht ORDER BY hypertable",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Database Size Overview",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT schemaname AS schema, tablename AS table, pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) AS total_size, pg_total_relation_size(schemaname || '.' || tablename) AS size_bytes FROM pg_tables WHERE schemaname IN ('raw', 'bronze', 'silver', 'analytics', 'ops') ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "EOD Rows Ingested (per ticker)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 day', recorded_at) AS time, labels->>'ticker' AS ticker, SUM(metric_value) AS rows FROM ops.pipeline_metrics WHERE metric_name = 'eod_rows_ingested' AND recorded_at >= $__timeFrom() AND recorded_at <= $__timeTo() GROUP BY time, labels->>'ticker' ORDER BY time",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 40 }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Pipeline Completion Events",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 day', recorded_at) AS time, metric_name, SUM(metric_value) AS value FROM ops.pipeline_metrics WHERE metric_name IN ('eod_pipeline_completed', 'quality_audit_completed') AND recorded_at >= $__timeFrom() AND recorded_at <= $__timeTo() GROUP BY time, metric_name ORDER BY time",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}
