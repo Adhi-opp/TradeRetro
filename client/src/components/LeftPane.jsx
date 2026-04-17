@@ -1,4 +1,4 @@
-import { ShieldAlert, BarChart3, Loader } from 'lucide-react';
+import { ShieldAlert, BarChart3, Activity, Loader } from 'lucide-react';
 import StrategyForm from './StrategyForm';
 import AiVerifyForm from './AiVerifyForm';
 
@@ -12,6 +12,8 @@ export default function LeftPane({
   error,
 }) {
   const isManual = mode === 'manual';
+  const isAi = mode === 'ai';
+  const isPipeline = mode === 'pipeline';
 
   return (
     <div className="left-pane">
@@ -40,18 +42,38 @@ export default function LeftPane({
             Manual
           </button>
           <button
-            className={'mode-btn mode-btn-ai' + (!isManual ? ' mode-active' : '')}
+            className={'mode-btn mode-btn-ai' + (isAi ? ' mode-active' : '')}
             onClick={() => onSwitchMode('ai')}
             disabled={loading}
           >
             <ShieldAlert size={14} />
             AI Verify
           </button>
+          <button
+            className={'mode-btn mode-btn-pipeline' + (isPipeline ? ' mode-active' : '')}
+            onClick={() => onSwitchMode('pipeline')}
+            disabled={loading}
+          >
+            <Activity size={14} />
+            Data Pipeline
+          </button>
         </div>
 
         {/* Form */}
         {isManual ? (
           <StrategyForm onRunBacktest={onRunBacktest} onRunMonteCarlo={onRunMonteCarlo} isLoading={loading} />
+        ) : isPipeline ? (
+          <div className="form-panel pipeline-mode-panel">
+            <div className="form-panel-title">Observability Console</div>
+            <p className="pipeline-mode-copy">
+              The Grafana pipeline dashboard is embedded directly into TradeRetro so you can monitor
+              ingestion, freshness, and orchestration health without leaving the app shell.
+            </p>
+            <div className="pipeline-mode-hint">
+              If the iframe is blank, recreate the `grafana` container and confirm anonymous viewer
+              access is enabled.
+            </div>
+          </div>
         ) : (
           <AiVerifyForm onVerify={onVerify} isLoading={loading} />
         )}

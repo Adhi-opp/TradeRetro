@@ -171,8 +171,9 @@ function MonteCarloResults({ data }) {
 export default function RightPane({ mode, result, verdictResult, monteCarloResult, loading, error, applyCosts, theme, backtestTicker, strategyParams, backtestRange }) {
   const [activeTab, setActiveTab] = useState('results');
   const isManual = mode === 'manual';
+  const isAi = mode === 'ai';
   const hasManualResults = isManual && !loading && result && result.metrics;
-  const hasVerdictResults = !isManual && !loading && verdictResult;
+  const hasVerdictResults = isAi && !loading && verdictResult;
   const hasMonteCarloResults = isManual && !loading && monteCarloResult;
   const isIdle = !loading && !hasManualResults && !hasVerdictResults && !hasMonteCarloResults;
   const executionMeta = result?.metadata || monteCarloResult?.metadata || null;

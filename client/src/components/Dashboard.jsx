@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import LeftPane from './LeftPane';
+import PipelineDashboard from './PipelineDashboard';
 import RightPane from './RightPane';
 
 const TIMEOUT_MS = 30000;       // 30s for backtest & monte carlo
@@ -13,7 +14,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
-  const [mode, setMode] = useState('manual'); // 'manual' | 'ai'
+  const [mode, setMode] = useState('manual'); // 'manual' | 'ai' | 'pipeline'
   const [result, setResult] = useState(null);
   const [verdictResult, setVerdictResult] = useState(null);
   const [monteCarloResult, setMonteCarloResult] = useState(null);
@@ -207,19 +208,23 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           loading={loading}
           error={error}
         />
-        <RightPane
-          mode={mode}
-          result={result}
-          verdictResult={verdictResult}
-          monteCarloResult={monteCarloResult}
-          loading={loading}
-          error={error}
-          applyCosts={applyCosts}
-          theme={theme}
-          backtestTicker={backtestTicker}
-          strategyParams={strategyParams}
-          backtestRange={backtestRange}
-        />
+        {mode === 'pipeline' ? (
+          <PipelineDashboard />
+        ) : (
+          <RightPane
+            mode={mode}
+            result={result}
+            verdictResult={verdictResult}
+            monteCarloResult={monteCarloResult}
+            loading={loading}
+            error={error}
+            applyCosts={applyCosts}
+            theme={theme}
+            backtestTicker={backtestTicker}
+            strategyParams={strategyParams}
+            backtestRange={backtestRange}
+          />
+        )}
       </div>
     </div>
   );
