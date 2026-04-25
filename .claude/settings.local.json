@@ -6,7 +6,10 @@
       "Bash(python data/fetch_nse_data.py:*)",
       "Bash(curl:*)",
       "Bash(python -m json.tool:*)",
-      "Bash(python fetch_nse_data.py:*)"
+      "Bash(python fetch_nse_data.py:*)",
+      "Bash(find /c/Users/ADHIRAJ/TradeRetro/python-quant-engine -type f -name *.py)",
+      "Bash(find /c/Users/ADHIRAJ/TradeRetro -type f \\\\\\(-name *.sql -o -name *init* -o -name *schema* -o -name *migration* \\\\\\))",
+      "Bash(python -c \"import sys, json; paths = list\\(json.loads\\(sys.stdin.read\\(\\)\\)['paths'].keys\\(\\)\\); print\\('\\\\n'.join\\(sorted\\(paths\\)\\)\\)\")"
     ]
   }
 }

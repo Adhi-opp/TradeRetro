@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from services.db import get_pool
+from services.ticker_resolver import normalize
 
 router = APIRouter()
 
@@ -31,8 +32,10 @@ async def unified_chart_data(
     endDate: Optional[str] = Query(None),
     limit: Optional[int] = Query(None, ge=1, le=5000),
 ):
-    bare_ticker = ticker.upper()
-    pg_ticker = f"{bare_ticker}.NS"
+    try:
+        pg_ticker = normalize(ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     start_date_obj = _parse_date(startDate, "startDate")
     end_date_obj = _parse_date(endDate, "endDate")
@@ -88,7 +91,7 @@ async def unified_chart_data(
     if not rows:
         raise HTTPException(
             status_code=404,
-            detail=f"No PostgreSQL data for {bare_ticker}. Run the ingestion pipeline.",
+            detail=f"No PostgreSQL data for {pg_ticker}. Run the ingestion pipeline.",
         )
 
     data = []
@@ -106,7 +109,7 @@ async def unified_chart_data(
         })
 
     return {
-        "ticker": bare_ticker,
+        "ticker": pg_ticker,
         "count": len(data),
         "requestedRange": {"startDate": startDate, "endDate": endDate},
         "actualRange": {

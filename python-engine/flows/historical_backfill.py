@@ -43,13 +43,15 @@ async def fetch_historical(ticker: str, period: str = "10y") -> list[dict]:
 
     rows = []
     for i in range(len(df)):
+        vol_raw = df["Volume"].iloc[i] if "Volume" in df.columns else 0
+        vol = 0 if pd.isna(vol_raw) else int(vol_raw)
         rows.append({
             "date": df.index[i].date(),
-            "open": round(float(df["Open"].iloc[i]), 2),
-            "high": round(float(df["High"].iloc[i]), 2),
-            "low": round(float(df["Low"].iloc[i]), 2),
-            "close": round(float(df["Close"].iloc[i]), 2),
-            "volume": int(df["Volume"].iloc[i]),
+            "open": round(float(df["Open"].iloc[i]), 4),
+            "high": round(float(df["High"].iloc[i]), 4),
+            "low": round(float(df["Low"].iloc[i]), 4),
+            "close": round(float(df["Close"].iloc[i]), 4),
+            "volume": vol,
         })
 
     log.info("Fetched %d historical rows for %s", len(rows), ticker)

@@ -90,15 +90,6 @@ def test_backtest_rejects_invalid_strategy(client):
     assert resp.status_code == 400
 
 
-# ── BS Detector endpoint ─────────────────────────────────────
-
-
-def test_verify_strategy_rejects_empty(client):
-    """POST /api/verify-strategy with empty body should return 400."""
-    resp = client.post("/api/verify-strategy", json={})
-    assert resp.status_code == 400
-
-
 # ── Ingestion endpoints ──────────────────────────────────────
 
 

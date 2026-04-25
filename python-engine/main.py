@@ -1,8 +1,9 @@
 """
-TradeRetro — Unified Python Backend
+TradeRetro - Unified Python Backend
 ====================================
-Single FastAPI app consolidating backtest engine, BS detector,
-and signal serving. All services use a shared asyncpg pool.
+Single FastAPI app consolidating backtest engine, live market data,
+cross-asset correlation, and signal serving. All services use a
+shared asyncpg pool.
 """
 
 from contextlib import asynccontextmanager
@@ -15,7 +16,7 @@ from fastapi.responses import JSONResponse
 from config import settings
 from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
-from routers import backtest, bs_detector, signals, health, auth, ingestion
+from routers import backtest, signals, health, auth, ingestion, correlation, universe, live
 
 
 @asynccontextmanager
@@ -45,10 +46,12 @@ app.add_middleware(
 # ── Mount Routers ─────────────────────────────────────────────
 app.include_router(health.router)
 app.include_router(backtest.router)
-app.include_router(bs_detector.router)
 app.include_router(signals.router)
 app.include_router(auth.router)
 app.include_router(ingestion.router)
+app.include_router(correlation.router)
+app.include_router(universe.router)
+app.include_router(live.router)
 
 
 # ── Exception Handlers ────────────────────────────────────────

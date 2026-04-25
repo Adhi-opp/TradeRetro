@@ -14,8 +14,15 @@ import math
 import numpy as np
 
 from engine.costs import create_seeded_rng, calculate_indian_costs
-from engine.indicators import compute_rsi, compute_macd, compute_sma
-from engine.strategies import evaluate_ma_crossover, evaluate_rsi, evaluate_macd
+from engine.indicators import (
+    compute_rsi, compute_macd, compute_sma, compute_bollinger_bands,
+    compute_vwap, compute_donchian_channel,
+)
+from engine.strategies import (
+    evaluate_ma_crossover, evaluate_rsi, evaluate_macd,
+    evaluate_bollinger_breakout, evaluate_orb, evaluate_vwap_reversion,
+    evaluate_donchian_breakout,
+)
 from engine import metrics as m
 
 
@@ -148,6 +155,38 @@ class SimulationEngine:
                 "macdOffset": len(close_prices) - len(macd_values),
             }
 
+        if strategy_type == "BOLLINGER_BREAKOUT":
+            bb_period = params.get("bbPeriod", 20)
+            bb_std = params.get("bbStdDev", 2.0)
+            bb_values = compute_bollinger_bands(close_prices, bb_period, bb_std)
+            return {
+                "bb": bb_values,
+                "bbOffset": bb_period - 1,
+            }
+
+        if strategy_type == "ORB":
+            return {
+                "ohlc": self.market_data,
+            }
+
+        if strategy_type == "VWAP_REVERSION":
+            volumes = np.array([c.get("volume", 1) for c in self.market_data], dtype=np.float64)
+            vwap_values = compute_vwap(close_prices, volumes)
+            return {
+                "vwap": vwap_values,
+                "close": close_prices,
+            }
+
+        if strategy_type == "DONCHIAN_BREAKOUT":
+            high_prices = np.array([c["high"] for c in self.market_data], dtype=np.float64)
+            low_prices = np.array([c["low"] for c in self.market_data], dtype=np.float64)
+            dc_period = params.get("dcPeriod", 20)
+            donchian_values = compute_donchian_channel(high_prices, low_prices, dc_period)
+            return {
+                "donchian": donchian_values,
+                "close": close_prices,
+            }
+
         raise ValueError(f"Unknown strategy type: {strategy_type}")
 
     def _evaluate_strategy(self, candle: dict, indicators: dict, index: int) -> str:
@@ -167,6 +206,18 @@ class SimulationEngine:
 
         if strategy_type == "MACD":
             return evaluate_macd(indicators, index)
+
+        if strategy_type == "BOLLINGER_BREAKOUT":
+            return evaluate_bollinger_breakout(indicators, index)
+
+        if strategy_type == "ORB":
+            return evaluate_orb(indicators, index, params.get("orbMinutes", 30))
+
+        if strategy_type == "VWAP_REVERSION":
+            return evaluate_vwap_reversion(indicators, index, params.get("reversionPct", 0.01))
+
+        if strategy_type == "DONCHIAN_BREAKOUT":
+            return evaluate_donchian_breakout(indicators, index)
 
         raise ValueError(f"Unknown strategy type: {strategy_type}")
 
