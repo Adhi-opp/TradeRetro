@@ -1,0 +1,215 @@
+{
+  "uid": "pipeline-health",
+  "title": "Pipeline Health",
+  "tags": ["traderetro", "pipeline"],
+  "timezone": "Asia/Kolkata",
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Ingestion Runs (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Total Runs\" FROM ops.ingestion_log WHERE started_at >= NOW() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Success Rate (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE status = 'success') / GREATEST(COUNT(*), 1), 1) AS \"Success %\" FROM ops.ingestion_log WHERE started_at >= NOW() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed Runs (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Failures\" FROM ops.ingestion_log WHERE started_at >= NOW() - INTERVAL '24 hours' AND status = 'failed'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total Rows Ingested (24h)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(SUM(rows_inserted), 0) AS \"Rows\" FROM ops.ingestion_log WHERE started_at >= NOW() - INTERVAL '24 hours' AND status = 'success'",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Ingestion Runs Over Time",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 hour', started_at) AS time, COUNT(*) FILTER (WHERE status = 'success') AS \"Success\", COUNT(*) FILTER (WHERE status = 'failed') AS \"Failed\" FROM ops.ingestion_log WHERE started_at >= $__timeFrom() AND started_at <= $__timeTo() GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Success" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ],
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": { "mode": "normal" }
+          }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Rows Ingested Over Time",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 hour', started_at) AS time, SUM(rows_inserted) AS \"Rows Inserted\", SUM(rows_fetched) AS \"Rows Fetched\" FROM ops.ingestion_log WHERE started_at >= $__timeFrom() AND started_at <= $__timeTo() AND status = 'success' GROUP BY time ORDER BY time",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 20 }
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Data Freshness (per Ticker)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT ticker, high_watermark AS \"Latest Date\", last_refreshed AS \"Last Refreshed\", CURRENT_DATE - high_watermark AS \"Days Behind\" FROM ops.data_catalog ORDER BY high_watermark DESC NULLS LAST",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Days Behind" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 2 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Recent Ingestion Log",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT run_id, ticker, load_type, status, rows_fetched, rows_inserted, started_at, finished_at, CASE WHEN error_message IS NOT NULL THEN LEFT(error_message, 80) ELSE NULL END AS error FROM ops.ingestion_log ORDER BY started_at DESC LIMIT 20",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Pipeline Metrics",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "uid": "timescaledb" },
+      "targets": [
+        {
+          "rawSql": "SELECT time_bucket('1 hour', recorded_at) AS time, metric_name AS metric, SUM(metric_value) AS value FROM ops.pipeline_metrics WHERE recorded_at >= $__timeFrom() AND recorded_at <= $__timeTo() GROUP BY time, metric_name ORDER BY time",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}

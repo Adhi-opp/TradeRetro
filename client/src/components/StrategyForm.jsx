@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Play, Shuffle } from 'lucide-react';
+import TickerInput from './TickerInput';
 
 const STRATEGIES = [
   { value: 'MOVING_AVERAGE_CROSSOVER', label: 'Moving Average Crossover' },
@@ -7,34 +8,8 @@ const STRATEGIES = [
   { value: 'MACD', label: 'MACD' },
 ];
 
-const STOCKS = [
-  // Banking
-  { value: 'HDFCBANK',   label: 'HDFC Bank',               sector: 'Banking' },
-  { value: 'ICICIBANK',  label: 'ICICI Bank',              sector: 'Banking' },
-  { value: 'SBIN',       label: 'State Bank of India',     sector: 'Banking' },
-  { value: 'AXISBANK',   label: 'Axis Bank',               sector: 'Banking' },
-  // IT
-  { value: 'TCS',        label: 'Tata Consultancy Services', sector: 'IT' },
-  { value: 'INFY',       label: 'Infosys',                 sector: 'IT' },
-  { value: 'WIPRO',      label: 'Wipro',                   sector: 'IT' },
-  { value: 'HCLTECH',    label: 'HCL Technologies',        sector: 'IT' },
-  // Energy
-  { value: 'RELIANCE',   label: 'Reliance Industries',     sector: 'Energy' },
-  { value: 'ONGC',       label: 'Oil & Natural Gas Corp',  sector: 'Energy' },
-  // FMCG
-  { value: 'HINDUNILVR', label: 'Hindustan Unilever',      sector: 'FMCG' },
-  { value: 'ITC',        label: 'ITC Limited',             sector: 'FMCG' },
-  // Finance
-  { value: 'BAJFINANCE', label: 'Bajaj Finance',           sector: 'Finance' },
-  // Telecom
-  { value: 'BHARTIARTL', label: 'Bharti Airtel',           sector: 'Telecom' },
-  // Index
-  { value: 'NIFTY50',    label: 'Nifty 50 Index',          sector: 'Index' },
-  { value: 'BANKNIFTY',  label: 'Bank Nifty Index',        sector: 'Index' },
-];
-
 export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading }) {
-  const [ticker, setTicker] = useState('RELIANCE');
+  const [ticker, setTicker] = useState('RELIANCE.NS');
   const [strategyType, setStrategyType] = useState('MOVING_AVERAGE_CROSSOVER');
   const [fastSma, setFastSma] = useState(50);
   const [slowSma, setSlowSma] = useState(200);
@@ -42,11 +17,11 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
   const [oversold, setOversold] = useState(30);
   const [overbought, setOverbought] = useState(70);
   const [initialCapital, setInitialCapital] = useState(100000);
-  const [startDate, setStartDate] = useState('2020-01-01');
+  const [startDate, setStartDate] = useState('2025-04-01');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const getFormParams = () => ({
-    ticker: ticker.toUpperCase(),
+    ticker: (ticker || '').toUpperCase(),
     strategyType,
     initialCapital: Number(initialCapital),
     fastSma: Number(fastSma),
@@ -72,23 +47,12 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
       <div className="form-panel-title">Strategy Configuration</div>
 
       <div className="form-grid">
-        <div className="form-field">
-          <label htmlFor="ticker">Stock</label>
-          <select
-            id="ticker"
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            disabled={isLoading}
-          >
-            {[...new Set(STOCKS.map((s) => s.sector))].map((sector) => (
-              <optgroup key={sector} label={sector}>
-                {STOCKS.filter((s) => s.sector === sector).map((s) => (
-                  <option key={s.value} value={s.value}>{s.value} — {s.label}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+        <TickerInput
+          label="Stock / Index / Macro"
+          value={ticker}
+          onChange={setTicker}
+          disabled={isLoading}
+        />
 
         <div className="form-field">
           <label htmlFor="strategyType">Strategy</label>
@@ -205,8 +169,10 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             disabled={isLoading}
+            min="2024-04-18"
             required
           />
+          <small className="field-hint">Warehouse starts 2024-04-18 · leave warm-up room for Slow SMA</small>
         </div>
 
         <div className="form-field">
