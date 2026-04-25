@@ -46,15 +46,15 @@ Upstox WebSocket ──> Redis Streams ──> Consumer Worker ──> Timescale
 |-------|-----------|---------|
 | **Database** | TimescaleDB (PostgreSQL 16 + time-series extension) | Medallion-architected warehouse with hypertables and continuous aggregates |
 | **Message Broker** | Redis 7 (Streams) | Decoupled real-time tick ingestion via consumer groups |
-| **Backend** | FastAPI + Uvicorn (Python 3.12) | Unified async API serving backtest, signals, ingestion, and auth |
+| **Backend** | FastAPI + Uvicorn (Python 3.12) | Unified async API serving backtest, signals, ingestion, auth, correlation analytics |
 | **Orchestration** | Prefect 3 | DAG-based ETL orchestration with UI, scheduling, and flow monitoring |
 | **Observability** | Grafana | 4 auto-provisioned dashboards querying TimescaleDB directly |
 | **Live Data** | Upstox API v2 (WebSocket + REST) | Real-time NSE market data feed (protobuf-encoded) |
-| **Historical Data** | yfinance | Bulk historical OHLCV backfill for 10 NSE large-caps |
-| **Frontend** | React 19 + Vite + TailwindCSS | Backtesting UI, cross-asset monitor, data quality views, embedded Grafana dashboards |
-| **Charting** | Lightweight Charts (TradingView) | Interactive OHLCV candlestick charts with signal overlays |
+| **Historical Data** | yfinance | Bulk historical OHLCV backfill for 10 NSE large-caps + macro series |
+| **Frontend** | React 19 + Vite + TailwindCSS | Backtesting UI, cross-asset monitor, data quality views, correlation lab, embedded Grafana dashboards |
+| **Charting** | Recharts + Lightweight Charts | Interactive charts for correlations, equity curves, monthly returns, distributions |
 | **Infra** | Docker Compose (7 containers) | Full-stack containerized deployment, ~1.4GB RAM |
-| **Testing** | pytest (73 tests) | Unit tests, integration tests, endpoint tests with mocked infrastructure |
+| **Testing** | pytest (80+ tests) | Unit tests, integration tests, endpoint tests, correlation engine tests with mocked infrastructure |
 
 ---
 
@@ -222,12 +222,30 @@ docker exec -it traderetro-timescaledb-1 psql -U postgres -d traderetro_raw \
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/correlation/matrix` | N×N Pearson-correlation heatmap on log-returns |
-| `GET` | `/api/correlation/rolling` | Rolling-window correlation of base vs peers over time |
-| `GET` | `/api/correlation/leadlag` | Lagged-correlation proxy (**NOT** Granger causality — see `disclaimer`) |
-| `GET` | `/api/correlation/divergence` | Normalized cumulative-% series for divergence detection |
+| `GET` | `/api/correlation/matrix` | N×N Pearson-correlation heatmap on log-returns · window-selectable (10/20/60d) |
+| `GET` | `/api/correlation/rolling` | Rolling-window correlation of base vs peers · exposes regime breaks |
+| `GET` | `/api/correlation/leadlag` | Lagged-correlation proxy (**NOT** Granger causality — per-peer best-lag bars with direction) |
+| `GET` | `/api/correlation/divergence` | Normalized cumulative-% series for heavyweight divergence detection |
 
 All four endpoints are **research-only** (no orders, no sizing), read from `raw.historical_prices`, and return `{"status": "insufficient_data", ...}` with HTTP 200 when the warehouse is too thin to compute.
+
+### Live Market Data
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/live/quotes` | Latest close + prev close + pct change for symbol list |
+| `GET` | `/api/live/prices/{symbol}` | Close price series for chart (configurable lookback: 30-750 days) |
+| `GET` | `/api/live/vix` | Current India VIX level + regime band (Low/Normal/Elevated/High) with advice |
+| `GET` | `/api/live/signals` | Computed macro signal feed: heavyweight divergence, USD/INR spikes, VIX alerts, risk-off combos |
+
+### User Ticker Universe
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/universe` | List all tickers with coverage stats (backfill status, row count, date range) |
+| `POST` | `/api/universe` | Add a ticker, trigger on-demand yfinance backfill if needed (returns job_id for polling) |
+| `DELETE` | `/api/universe/{symbol}` | Remove from universe (warehouse data retained) |
+| `GET` | `/api/universe/resolve` | Normalize + validate a free-text ticker input |
 
 ### Health
 
@@ -334,28 +352,81 @@ Grafana is configured for anonymous read access and iframe embedding (used in th
 
 ---
 
-## Correlation Lab
+## Cross-Asset Monitor & Correlation Lab
 
-A research-only cross-asset analytics tab that sits alongside Backtest, Data Pipeline, and Data Quality. It reads from `raw.historical_prices` in the medallion warehouse and surfaces live EOD quotes, volatility regime, correlation, lead-lag, and divergence analytics. If the warehouse is too thin to compute, each panel shows an insufficient-data state instead of fake numbers.
+### Live Market Dashboard (Cross-Asset Monitor)
 
-| Panel | What it shows | API |
-|-------|---------------|-----|
-| **Correlation Matrix** | N×N Pearson-correlation heatmap on log-returns, window selectable (10 / 20 / 60 days). Tickers with too little data are dropped into `excluded_due_to_missing_data`. | `GET /api/correlation/matrix` |
-| **Rolling Correlation History** | Per-peer rolling correlation vs a base ticker, plotted over the last *N* bars — exposes regime breaks. | `GET /api/correlation/rolling` |
-| **Lead-Lag Proxy** | Horizontal bars showing which peers tend to lead the base, picking the lag `k` that maximizes `abs(corr(base_t, peer_{t-k}))`. **Not** true Granger causality — the response carries `lead_lag_proxy: true` plus a disclaimer. | `GET /api/correlation/leadlag` |
-| **Heavyweight Divergence** | Cumulative-% change of each ticker vs day 0 of the window. Divergence from the index exposes heavyweight-driven traps. | `GET /api/correlation/divergence` |
+A research-focused tab displaying live EOD quotes, volatility regime, and macro signal feed. Consists of:
 
-**Universe:** all 12 tracked NSE equities + NIFTY 50 + BANK NIFTY, plus the two cross-asset macro series `USDINR` (yfinance `USDINR=X`) and `CRUDE` (yfinance `CL=F`). Macro rows are stored bare (no `.NS` suffix) under the same `raw.historical_prices` table.
+- **Live Ticker Row**: Latest close prices with daily % change for 7 selected symbols (NIFTY 50, BANK NIFTY, RELIANCE, HDFC BANK, ICICI BANK, USD/INR, CRUDE). Color-coded by asset class (equity, index, forex, commodity).
+- **VIX Gauge + Regime**: Real-time India VIX level with regime band (Low < 13, Normal 13–20, Elevated 20–28, High > 28) and regime-specific trading advice.
+- **Macro Signal Feed**: Automated alerts on heavyweight divergence, USD/INR spikes (>0.15%), VIX regime shifts, and risk-off combos (equities down + INR weakening).
+- **Historical Price Charts**: 1-year EOD close series for NIFTY 50 and BANK NIFTY with lookback selector (30/60/120/250 days).
 
-**First-time setup:** backfill the macro tickers before opening the Lab, otherwise USDINR and CRUDE will appear in the "excluded — not enough data" footer.
+### Correlation Lab (Pure Pandas/Numpy Analytics)
 
+Four research-only panels for cross-asset analysis, reading directly from `raw.historical_prices`:
+
+| Panel | What it shows | Control |
+|-------|---------------|---------|
+| **Correlation Matrix** | N×N Pearson heatmap on log-returns, sparse tickers filtered via MIN_COVERAGE=0.8 | Window selector: 10/20/60 days |
+| **Rolling Correlation** | Per-peer rolling correlation vs NIFTY 50 over time — exposes regime breaks | Window: 10/20/60d · Lookback: 120d |
+| **Lead-Lag Proxy** | Horizontal bars: per-peer best lag `k` maximizing `\|corr(base_t, peer_{t-k})\|`. Positive `k` ⇒ peer leads. **NOT Granger causality** — see disclaimer. | Max lag: ±5 bars · Window: 60d |
+| **Heavyweight Divergence** | Cumulative-% change from window start — shows if index strength is driven by heavyweights or breadth | Lookback: 30/60/120 days |
+
+**Supported Universe**: 12 NSE equities (RELIANCE, HDFCBANK, ICICIBANK, SBIN, TCS, INFY, HCLTECH, ITC, BHARTIARTL, BAJFINANCE) + 2 indices (NIFTY50.NS, BANKNIFTY.NS) + 2 macro series (USDINR, CRUDE).
+
+**Setup**: Macro tickers are optional; backfill before opening the Lab:
 ```bash
 curl -X POST http://localhost:8000/api/ingest/backfill \
   -H 'Content-Type: application/json' \
-  -d '{"tickers": ["USDINR", "CRUDE"], "period": "2y"}'
+  -d '{"tickers": ["USDINR", "CRUDE", "INDIAVIX"], "period": "2y"}'
 ```
 
-The math is pure pandas/numpy — no new dependencies — and lives in [`python-engine/engine/corr_engine.py`](python-engine/engine/corr_engine.py) so it can be unit-tested without a database.
+**Math Layer**: Pure pandas/numpy in [`python-engine/engine/corr_engine.py`](python-engine/engine/corr_engine.py) — unit-testable without a database, runs in executor so the event loop never blocks.
+
+---
+
+## Data Quality & Coverage Monitoring
+
+### Data Quality Dashboard
+
+A dedicated UI tab showing warehouse health, ticker coverage, and ingestion freshness:
+
+- **Coverage Stats**: # tickers backfilled / total, overall completion %, total rows, average rows/ticker.
+- **Freshness Gauge**: Days since the most recent backfill, freshness badges (good/warning/critical).
+- **Pipeline Status**: Health indicator (healthy/degraded/critical) based on completion %, auto-refreshing every 30s.
+- **Ticker Inventory Table**: Per-ticker row count, date range (earliest–latest), backfill status (pending/running/completed/failed), staleness, and a quality % bar.
+
+**Source**: Joins `ops.user_universe` with `raw.historical_prices` aggregations for real-time coverage insights.
+
+---
+
+## Client-Side Performance Analytics
+
+All performance metrics are computed client-side in the browser after backtest, using the existing `equityCurve` and `trades` arrays—**no backend change required**. Deployed in [`client/src/utils/performance.js`](client/src/utils/performance.js).
+
+### Metrics Computed
+
+| Metric | Formula | Purpose |
+|--------|---------|---------|
+| **Sharpe Ratio** | `(mean_daily_return / stdev_daily_return) × √252` | Risk-adjusted return; rf=0 |
+| **Sortino Ratio** | `(mean_daily_return / stdev_downside) × √252` | Downside-only volatility focus |
+| **Calmar Ratio** | `CAGR / \|max_drawdown\|` | Recovery efficiency |
+| **Max Drawdown Duration** | Days from peak to recovery | Longest consecutive underwater period |
+| **Value-at-Risk (VaR 95%)** | 5th percentile of daily returns | Worst expected loss 95% of the time |
+| **Monthly Returns** | Compound month-to-month | Monthly heatmap |
+| **Return Distribution** | Histogram: 30 bins from min to max daily % | Distribution shape, skew |
+| **Trade Analytics** | Win rate, profit factor, expectancy, streaks | Per-trade stats |
+
+### Frontend Visualizations
+
+- **Risk Metrics Grid**: 8 tiles (Sharpe, Sortino, Calmar, volatility, max DD, DD duration, VaR 95%, alpha vs B&H)
+- **Underwater Plot**: Drawdown area chart with worst DD highlighted
+- **Monthly Heatmap**: Year×Month grid, hot/cold cells by return, YTD sums
+- **Return Distribution**: Bar chart with mean/VaR 95% annotations
+- **Trade Stats Panel**: Wins/losses, profit factor, best/worst trade, streaks, avg holding period
+- **Summary Ribbon**: Initial → final capital, total return, vs buy-hold comparison, strategy/date/days metadata
 
 ---
 
@@ -369,7 +440,15 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-### Test Suite (73 tests)
+### Run Tests Locally
+
+```bash
+cd python-engine
+pip install -r requirements.txt
+python -m pytest tests/ -v
+```
+
+### Test Suite (80+ tests)
 
 | File | Tests | What It Covers |
 |------|-------|---------------|
@@ -378,6 +457,7 @@ python -m pytest tests/ -v
 | `test_metrics.py` | 15 | Financial metrics: Sharpe, max drawdown, CAGR, alpha, information ratio |
 | `test_pipeline.py` | 15 | Market hours, quality checks, flow structure, Prefect DAG imports |
 | `test_routers.py` | 10 | FastAPI endpoints: health, backtest, BS detector, ingestion triggers |
+| `test_correlation.py` | 16+ | Correlation engine: matrix, rolling, lead-lag, divergence; router integration with mocked DB |
 
 Tests run without Docker by stubbing heavy dependencies (Redis, asyncpg, Prefect) via `sys.modules`. Prefect-dependent tests auto-skip locally and pass in Docker.
 
@@ -407,20 +487,22 @@ TradeRetro/
 │   │   ├── auth.py                 # Upstox OAuth2 flow
 │   │   └── health.py              # GET /api/health
 │   │
-│   ├── engine/                     # Vectorized backtest engine
+│   ├── engine/                     # Vectorized backtest engine + analytics
 │   │   ├── simulation.py           # SimulationEngine — main backtest loop
 │   │   ├── strategies.py           # MA Crossover, RSI, MACD signal evaluators
 │   │   ├── indicators.py           # SMA, EMA, RSI, MACD computation
 │   │   ├── costs.py                # Indian equity cost model (STT, GST, etc.)
-│   │   └── metrics.py              # Sharpe, CAGR, drawdown, alpha, IR
+│   │   ├── metrics.py              # Sharpe, CAGR, drawdown, alpha, IR
+│   │   └── corr_engine.py          # Pure pandas/numpy: correlation, rolling, lead-lag, divergence
 │   │
 │   ├── services/                   # Shared business logic
 │   │   ├── db.py                   # asyncpg connection pool (lifespan-managed)
 │   │   ├── redis_client.py         # Redis Streams interface (XADD, XREADGROUP, XACK)
 │   │   ├── upstox_client.py        # Upstox OAuth2 + WebSocket URL retrieval
 │   │   ├── data_loader.py          # Historical data loading from TimescaleDB
-│   │   ├── ticker_resolver.py      # Ticker normalization + yfinance symbol mapping
-│   │   └── monte_carlo.py          # Monte Carlo simulation
+│   │   ├── ticker_resolver.py      # Ticker normalization + yfinance metadata
+│   │   ├── monte_carlo.py          # Monte Carlo simulation
+│   │   └── redis_client.py         # Redis Streams interface
 │   │
 │   ├── pipeline/                   # Streaming data pipeline
 │   │   ├── upstox_ws.py            # WebSocket producer -> Redis Streams
@@ -439,7 +521,7 @@ TradeRetro/
 │   │   ├── requests.py
 │   │   └── responses.py
 │   │
-│   ├── migrations/                 # Version-controlled SQL DDL (000-007)
+│   ├── migrations/                 # Version-controlled SQL DDL (000-008)
 │   │   ├── 000_create_raw_schema.sql
 │   │   ├── 001_create_ops_schema.sql
 │   │   ├── 002_create_analytics_schema.sql
@@ -447,37 +529,53 @@ TradeRetro/
 │   │   ├── 004_create_bronze_schema.sql
 │   │   ├── 005_create_silver_schema.sql
 │   │   ├── 006_create_gold_views.sql
-│   │   └── 007_create_pipeline_metrics.sql
+│   │   ├── 007_create_pipeline_metrics.sql
+│   │   └── 008_create_user_universe.sql
 │   │
 │   ├── proto/                      # Upstox protobuf definitions
 │   │   └── MarketDataFeed.proto
 │   │
-│   └── tests/                      # 73 tests
+│   └── tests/                      # 80+ tests
 │       ├── test_simulation.py
 │       ├── test_costs.py
 │       ├── test_metrics.py
 │       ├── test_pipeline.py
-│       └── test_routers.py
+│       ├── test_routers.py
+│       └── test_correlation.py
 │
 ├── client/                         # React frontend
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Dashboard.jsx       # Main layout (Backtest / Cross-Asset / Pipeline / Data Quality)
-│   │   │   ├── LeftPane.jsx        # Strategy config + mode toggle
-│   │   │   ├── RightPane.jsx       # Results display (charts, metrics, trades)
-│   │   │   ├── PipelineDashboard.jsx # Embedded Grafana iframe
-│   │   │   ├── ChartWidget.jsx     # TradingView Lightweight Charts
-│   │   │   ├── EquityChart.jsx     # Equity curve visualization
-│   │   │   ├── StrategyForm.jsx    # Backtest parameter input
-│   │   │   ├── MetricsCard.jsx     # Performance metrics display
-│   │   │   ├── CrossAssetMonitor.jsx # Live EOD/correlation analytics surface
-│   │   │   ├── DataQualityDashboard.jsx # Warehouse coverage and freshness
-│   │   │   ├── TradeTable.jsx      # Trade log with CSV export
-│   │   │   └── ErrorBoundary.jsx   # React error boundary
+│   │   │   ├── Dashboard.jsx                   # Main layout
+│   │   │   ├── LeftPane.jsx                    # Strategy config + mode toggle
+│   │   │   ├── RightPane.jsx                   # Results display
+│   │   │   ├── ChartWidget.jsx                 # TradingView Lightweight Charts
+│   │   │   ├── EquityChart.jsx                 # Equity curve visualization
+│   │   │   ├── StrategyForm.jsx                # Backtest parameter input
+│   │   │   ├── MetricsCard.jsx                 # Performance metrics display
+│   │   │   ├── CrossAssetMonitor.jsx           # Live quotes, VIX, signals, price charts
+│   │   │   ├── DataQualityDashboard.jsx        # Warehouse coverage and freshness
+│   │   │   ├── CorrelationMatrix.jsx           # Heatmap
+│   │   │   ├── RollingCorrPanel.jsx            # Rolling correlation over time
+│   │   │   ├── LeadLagPanel.jsx                # Lead-lag lagged correlation bars
+│   │   │   ├── DivergencePanel.jsx             # Normalized cumulative %
+│   │   │   ├── SummaryRibbon.jsx               # Capital, return, strategy metadata
+│   │   │   ├── RiskMetricsGrid.jsx             # 8-tile risk metrics
+│   │   │   ├── DrawdownChart.jsx               # Underwater plot
+│   │   │   ├── MonthlyHeatmap.jsx              # Year×Month returns heatmap
+│   │   │   ├── ReturnDistribution.jsx          # Daily return histogram
+│   │   │   ├── TradeStats.jsx                  # Trade analytics grid
+│   │   │   ├── TickerInput.jsx                 # Free-text with autocomplete
+│   │   │   ├── TradeTable.jsx                  # Trade log with CSV export
+│   │   │   ├── ErrorBoundary.jsx               # React error boundary
+│   │   │   └── PipelineDashboard.jsx           # Embedded Grafana iframe
 │   │   ├── App.jsx
-│   │   ├── api.js                  # API client
+│   │   ├── api.js                              # API client
 │   │   ├── main.jsx
-│   │   └── index.css               # TailwindCSS styles
+│   │   ├── index.css                           # TailwindCSS styles
+│   │   ├── utils/
+│   │   │   └── performance.js                  # Client-side analytics (Sharpe, Sortino, etc.)
+│   │   └── assets/
 │   ├── Dockerfile
 │   ├── vite.config.js
 │   └── package.json
@@ -494,6 +592,10 @@ TradeRetro/
         ├── data_quality.json       # Data quality dashboard (8 panels)
         └── system_metrics.json     # System metrics dashboard (10 panels)
 ```
+
+**Root utilities:**
+- `generate_pdf.py`: Creates a comprehensive TradeRetro_Documentation.pdf with 10+ sections, tables, and code samples. Useful for portfolio presentations.
+- `python-engine/run_api_with_dummy_redis.py`: Stubs Redis and Prefect dependencies, allowing the API to boot without Docker. Useful for local development and demo environments.
 
 ---
 
