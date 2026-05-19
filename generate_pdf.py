@@ -152,7 +152,7 @@ def build_pdf():
     pdf.bullet("Medallion architecture: Bronze (raw ticks) -> Silver (1min OHLCV) -> Gold (aggregates)")
     pdf.bullet("Prefect-orchestrated EOD pipeline with data quality gates (hard + soft checks)")
     pdf.bullet("Watermark-based CDC for incremental historical data loading")
-    pdf.bullet("Vectorized backtesting engine with 3 strategies and Monte Carlo simulation")
+    pdf.bullet("Vectorized backtesting engine with 7 strategies and parameter-sweep robustness testing")
     pdf.bullet("AI strategy verifier (BS Detector) — sandbox-executes user code against real data")
     pdf.bullet("4 auto-provisioned Grafana dashboards for pipeline observability")
     pdf.bullet("73-test suite covering engine, costs, metrics, pipeline, and API endpoints")
@@ -370,8 +370,8 @@ def build_pdf():
     pdf.sub_title("Backtesting")
     w3 = [20, 65, 105]
     pdf.table_row(("Method", "Endpoint", "Description"), w3, bold=True, fill=True)
-    pdf.table_row(("POST", "/api/backtest", "Run vectorized backtest (MA Crossover, RSI, MACD)"), w3)
-    pdf.table_row(("POST", "/api/monte-carlo", "Run Monte Carlo simulation on backtest results"), w3)
+    pdf.table_row(("POST", "/api/backtest", "Run vectorized backtest (7 strategies)"), w3)
+    pdf.table_row(("POST", "/api/backtest/sweep", "Parameter sweep — 2D metric grid"), w3)
 
     pdf.ln(3)
     pdf.sub_title("AI Strategy Verification")
@@ -422,7 +422,7 @@ def build_pdf():
     pdf.bullet("Vectorized simulation over historical OHLCV data from TimescaleDB")
     pdf.bullet("Realistic Indian equity cost model: STT, stamp duty, GST, brokerage, SEBI turnover fee, exchange fees")
     pdf.bullet("Deterministic slippage model with seeded pseudo-RNG")
-    pdf.bullet("Monte Carlo simulation for strategy robustness testing")
+    pdf.bullet("Parameter sweep for strategy robustness testing — visualizes Sharpe/return/drawdown across a 2D param grid")
     pdf.bullet("Equity curve, trade log, and performance metrics")
 
     pdf.ln(2)

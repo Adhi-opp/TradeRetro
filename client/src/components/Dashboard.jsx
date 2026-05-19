@@ -85,7 +85,6 @@ function AdminMenu({ mode, onSelect }) {
 export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   const [mode, setMode] = useState('manual');
   const [result, setResult] = useState(null);
-  const [monteCarloResult, setMonteCarloResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [applyCosts, setApplyCosts] = useState(false);
@@ -118,6 +117,23 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
         initialCapital: capital,
       },
       MACD: { initialCapital: capital },
+      BOLLINGER_BREAKOUT: {
+        bbPeriod: formParams.bbPeriod,
+        bbStdDev: formParams.bbStdDev,
+        initialCapital: capital,
+      },
+      ORB: {
+        orbMinutes: 30,
+        initialCapital: capital,
+      },
+      VWAP_REVERSION: {
+        reversionPct: formParams.reversionPct,
+        initialCapital: capital,
+      },
+      DONCHIAN_BREAKOUT: {
+        dcPeriod: formParams.dcPeriod,
+        initialCapital: capital,
+      },
     };
     return paramsByStrategy[formParams.strategyType];
   };
@@ -126,7 +142,6 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
     setLoading(true);
     setError(null);
     setResult(null);
-    setMonteCarloResult(null);
     const payload = {
       symbol: formParams.ticker,
       strategyType: formParams.strategyType,
@@ -149,41 +164,16 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
         strategyType: formParams.strategyType,
         fastSma: formParams.fastSma,
         slowSma: formParams.slowSma,
+        rsiPeriod: formParams.rsiPeriod,
+        oversold: formParams.oversold,
+        overbought: formParams.overbought,
+        bbPeriod: formParams.bbPeriod,
+        bbStdDev: formParams.bbStdDev,
+        dcPeriod: formParams.dcPeriod,
+        reversionPct: formParams.reversionPct,
       });
     } catch (err) {
       if (err.name === 'AbortError') setError('Request timed out — server took too long to respond');
-      else setError(err.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRunMonteCarlo = async (formParams) => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setMonteCarloResult(null);
-    const payload = {
-      symbol: formParams.ticker,
-      strategyType: formParams.strategyType,
-      params: buildParams(formParams),
-      startDate: formParams.startDate,
-      endDate: formParams.endDate,
-      runs: 30,
-    };
-    try {
-      const response = await fetchWithTimeout('http://localhost:8000/api/monte-carlo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }, TIMEOUT_MS);
-      const data = await response.json();
-      if (!response.ok) throw new Error(getErrorMessage(data, 'Monte Carlo failed'));
-      setMonteCarloResult(data);
-      setBacktestTicker(formParams.ticker.toUpperCase());
-      setBacktestRange({ startDate: formParams.startDate, endDate: formParams.endDate });
-    } catch (err) {
-      if (err.name === 'AbortError') setError('Request timed out — Monte Carlo took too long');
       else setError(err.message || 'Failed to connect to server');
     } finally {
       setLoading(false);
@@ -204,7 +194,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
         <div className="ide-header-left">
           <button className="app-logo app-logo-btn" onClick={onLogoClick} title="Back to landing">
             <h1>TradeRetro</h1>
-            <span>v0.3</span>
+            <span>v0.4</span>
           </button>
           <nav className="topbar-nav">
             <button
@@ -251,7 +241,6 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           <LeftPane
             mode={mode}
             onRunBacktest={handleRunBacktest}
-            onRunMonteCarlo={handleRunMonteCarlo}
             loading={loading}
             error={error}
           />
@@ -266,7 +255,6 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           <RightPane
             mode={mode}
             result={result}
-            monteCarloResult={monteCarloResult}
             loading={loading}
             error={error}
             applyCosts={applyCosts}

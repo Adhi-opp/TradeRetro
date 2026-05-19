@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Shuffle } from 'lucide-react';
+import { Play } from 'lucide-react';
 import TickerInput from './TickerInput';
 
 const STRATEGIES = [
@@ -8,7 +8,7 @@ const STRATEGIES = [
   { value: 'MACD', label: 'MACD' },
 ];
 
-export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading }) {
+export default function StrategyForm({ onRunBacktest, isLoading }) {
   const [ticker, setTicker] = useState('RELIANCE.NS');
   const [strategyType, setStrategyType] = useState('MOVING_AVERAGE_CROSSOVER');
   const [fastSma, setFastSma] = useState(50);
@@ -16,6 +16,10 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
   const [rsiPeriod, setRsiPeriod] = useState(14);
   const [oversold, setOversold] = useState(30);
   const [overbought, setOverbought] = useState(70);
+  const [bbPeriod, setBbPeriod] = useState(20);
+  const [bbStdDev, setBbStdDev] = useState(2.0);
+  const [dcPeriod, setDcPeriod] = useState(20);
+  const [reversionPct, setReversionPct] = useState(0.01);
   const [initialCapital, setInitialCapital] = useState(100000);
   const [startDate, setStartDate] = useState('2025-04-01');
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
@@ -29,6 +33,10 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
     rsiPeriod: Number(rsiPeriod),
     oversold: Number(oversold),
     overbought: Number(overbought),
+    bbPeriod: Number(bbPeriod),
+    bbStdDev: Number(bbStdDev),
+    dcPeriod: Number(dcPeriod),
+    reversionPct: Number(reversionPct),
     startDate,
     endDate,
   });
@@ -36,10 +44,6 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
   const handleSubmit = (e) => {
     e.preventDefault();
     onRunBacktest(getFormParams());
-  };
-
-  const handleMonteCarlo = () => {
-    if (onRunMonteCarlo) onRunMonteCarlo(getFormParams());
   };
 
   return (
@@ -161,6 +165,48 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
           </>
         )}
 
+        {strategyType === 'BOLLINGER_BREAKOUT' && (
+          <>
+            <div className="form-field">
+              <label htmlFor="bbPeriod">BB Period</label>
+              <input id="bbPeriod" type="number"
+                value={bbPeriod} onChange={(e) => setBbPeriod(e.target.value)}
+                disabled={isLoading} required min="5" max="200" />
+            </div>
+            <div className="form-field">
+              <label htmlFor="bbStdDev">BB Std Dev</label>
+              <input id="bbStdDev" type="number" step="0.1"
+                value={bbStdDev} onChange={(e) => setBbStdDev(e.target.value)}
+                disabled={isLoading} required min="0.5" max="5.0" />
+            </div>
+          </>
+        )}
+
+        {strategyType === 'DONCHIAN_BREAKOUT' && (
+          <div className="form-field">
+            <label htmlFor="dcPeriod">Donchian Period</label>
+            <input id="dcPeriod" type="number"
+              value={dcPeriod} onChange={(e) => setDcPeriod(e.target.value)}
+              disabled={isLoading} required min="5" max="200" />
+          </div>
+        )}
+
+        {strategyType === 'VWAP_REVERSION' && (
+          <div className="form-field">
+            <label htmlFor="reversionPct">Reversion %</label>
+            <input id="reversionPct" type="number" step="0.001"
+              value={reversionPct} onChange={(e) => setReversionPct(e.target.value)}
+              disabled={isLoading} required min="0.001" max="0.1" />
+            <small className="field-hint">Distance from VWAP to trigger reversion entry (e.g. 0.01 = 1%)</small>
+          </div>
+        )}
+
+        {strategyType === 'ORB' && (
+          <div className="form-field">
+            <small className="field-hint">ORB uses 30-min opening range. Designed for intraday data — daily EOD may produce no signals.</small>
+          </div>
+        )}
+
         <div className="form-field">
           <label htmlFor="startDate">Start Date</label>
           <input
@@ -200,10 +246,6 @@ export default function StrategyForm({ onRunBacktest, onRunMonteCarlo, isLoading
                 Run Backtest
               </>
             )}
-          </button>
-          <button type="button" className="btn-monte-carlo" disabled={isLoading} onClick={handleMonteCarlo}>
-            <Shuffle size={15} />
-            Monte Carlo
           </button>
         </div>
       </div>

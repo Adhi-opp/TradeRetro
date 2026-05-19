@@ -24,6 +24,7 @@ from config import settings
 from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
 from pipeline.consumer import consume_loop
+from pipeline.silver_aggregator import run_aggregator_loop
 
 logger = logging.getLogger("traderetro.worker")
 
@@ -45,8 +46,9 @@ async def main() -> None:
     tasks: list[asyncio.Task] = []
 
     try:
-        # Always run the consumer
+        # Always run the consumer + silver aggregator (Medallion bronze → silver)
         tasks.append(asyncio.create_task(consume_loop(), name="consumer"))
+        tasks.append(asyncio.create_task(run_aggregator_loop(), name="silver_aggregator"))
 
         if mode == "simulate":
             from pipeline.simulator import run_simulator

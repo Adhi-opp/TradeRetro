@@ -18,8 +18,11 @@ from config import settings
 
 logger = logging.getLogger("traderetro.upstox")
 
+# OAuth still lives at /v2/login (Upstox didn't version the auth flow).
+# Market data feed authorize is V3 — returns snake_case authorized_redirect_uri
+# and a wss URL pointing at /market-data-feeder/v3/...
 UPSTOX_AUTH_BASE = "https://api.upstox.com/v2/login/authorization"
-UPSTOX_WS_AUTH = "https://api.upstox.com/v2/feed/market-data-feed/authorize"
+UPSTOX_WS_AUTH = "https://api.upstox.com/v3/feed/market-data-feed/authorize"
 REDIS_TOKEN_KEY = "upstox:access_token"
 
 
@@ -95,7 +98,7 @@ class UpstoxAuth:
         return token is not None
 
     async def get_ws_url(self) -> str:
-        """Get authorized WebSocket URL for market data feed."""
+        """Get authorized WebSocket URL for V3 market data feed."""
         token = await self.get_access_token()
         if not token:
             raise RuntimeError("Not authenticated — complete OAuth at /api/auth/login")
@@ -109,7 +112,13 @@ class UpstoxAuth:
                 },
             )
             resp.raise_for_status()
-            return resp.json()["data"]["authorizedRedirectUri"]
+            data = resp.json()["data"]
+            # V3 returns snake_case; tolerate V2 camelCase fallback so an older
+            # response (e.g. from a hypothetical /v2 retry) doesn't crash us.
+            url = data.get("authorized_redirect_uri") or data.get("authorizedRedirectUri")
+            if not url:
+                raise RuntimeError(f"Upstox auth response missing redirect uri: {data}")
+            return url
 
     async def _store_token(self, token: str) -> None:
         """Persist token in Redis with 24h TTL."""

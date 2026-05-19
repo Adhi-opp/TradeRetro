@@ -95,29 +95,50 @@ async def run_quality_checks(ticker: str, only_recent: bool = False) -> dict:
     }
 
 
+# NIFTY 50 is the NSE benchmark — any date NIFTY trades is an NSE trading
+# day. Using it as canonical avoids hardcoding a holiday calendar and
+# avoids false positives from forex/commodity tickers that trade on
+# Indian holidays (USDINR, CRUDE).
+NSE_CALENDAR_TICKER = "NIFTY50.NS"
+
+
 async def run_gap_detection(ticker: str) -> dict:
-    """Detect missing trading days in raw.historical_prices (excludes weekends)."""
+    """
+    Detect missing NSE trading days for a ticker.
+
+    Uses NIFTY50.NS as the canonical NSE trading calendar. A date is a
+    "real gap" only if NIFTY traded on it but this ticker didn't. NSE
+    holidays (where NIFTY itself didn't trade) are excluded automatically.
+
+    For non-equity tickers (USDINR, CRUDE) that trade on more days than
+    NSE, this only flags missing NSE-equity dates — which is the right
+    behaviour since the warehouse is aligned to NSE sessions.
+    """
     pool = get_pool()
     async with pool.acquire() as conn:
-        gaps = await conn.fetch("""
+        gaps = await conn.fetch(
+            """
             WITH bounds AS (
                 SELECT MIN(trade_date) AS lo, MAX(trade_date) AS hi
                 FROM raw.historical_prices WHERE ticker = $1
             ),
-            date_range AS (
-                SELECT generate_series(lo, hi, '1 day'::interval)::date AS expected_date
-                FROM bounds
-            ),
-            existing AS (
+            ticker_dates AS (
                 SELECT trade_date FROM raw.historical_prices WHERE ticker = $1
+            ),
+            nse_calendar AS (
+                SELECT trade_date
+                FROM raw.historical_prices
+                WHERE ticker = $2
+                  AND trade_date BETWEEN (SELECT lo FROM bounds) AND (SELECT hi FROM bounds)
             )
-            SELECT d.expected_date
-            FROM date_range d
-            LEFT JOIN existing e ON d.expected_date = e.trade_date
-            WHERE e.trade_date IS NULL
-                AND EXTRACT(DOW FROM d.expected_date) NOT IN (0, 6)
-            ORDER BY d.expected_date
-        """, ticker)
+            SELECT n.trade_date AS expected_date
+            FROM nse_calendar n
+            LEFT JOIN ticker_dates t ON n.trade_date = t.trade_date
+            WHERE t.trade_date IS NULL
+            ORDER BY n.trade_date
+            """,
+            ticker, NSE_CALENDAR_TICKER,
+        )
 
     gap_dates = [r["expected_date"].isoformat() for r in gaps]
     return {

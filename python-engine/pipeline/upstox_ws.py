@@ -1,36 +1,37 @@
 """
-Upstox WebSocket Producer — connects to Upstox market data feed,
-decodes ticks, and pushes them to Redis Streams.
-
-The Upstox v2 WebSocket sends binary protobuf-encoded FeedResponse messages.
-This module decodes them into flat dicts and publishes to the `market:ticks`
-Redis Stream in the same format as the simulator.
+Upstox WebSocket Producer — connects to the Upstox V3 market data feed,
+decodes protobuf ticks, and pushes them to the `market:ticks` Redis Stream.
 
 Flow:
     1. Poll Redis for access token (set via /api/auth/login or /api/auth/token)
-    2. Get authorized WebSocket URL from Upstox
+    2. Get authorized V3 WebSocket URL from Upstox
     3. Connect, subscribe to instruments
-    4. Stream ticks → Redis until market closes
+    4. Stream ticks → Redis until stream window closes
     5. Sleep until next stream window, repeat
+
+Scope: equities + indices + India VIX only. Options/microstructure
+analytics belong to GammaLeak, not TradeRetro — see
+[[feedback-traderetro-vs-gammaleak]] in memory.
 """
 
 import asyncio
 import json
 import logging
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import websockets
 
 from services.redis_client import xadd_tick
 from services.upstox_client import upstox_auth
 from pipeline.market_hours import (
-    is_stream_window, seconds_until_stream_start, seconds_until_stream_end, IST,
+    is_stream_window, seconds_until_stream_start, IST,
 )
 
 logger = logging.getLogger("traderetro.ws_producer")
 
-# Default instruments to subscribe to (Nifty 50 large-caps + indices)
+# Default instruments to subscribe to (Nifty 50 large-caps + indices + India VIX).
+# Instrument keys follow Upstox V3 conventions (NSE_INDEX|<name>, NSE_EQ|<ISIN>).
+# India VIX was added in V3 — see Upstox Market Data Feed V3 docs.
 DEFAULT_INSTRUMENTS = [
     "NSE_EQ|INE009A01021",   # RELIANCE
     "NSE_EQ|INE002A01018",   # SBIN
@@ -44,6 +45,7 @@ DEFAULT_INSTRUMENTS = [
     "NSE_EQ|INE467B01029",   # INFY
     "NSE_INDEX|Nifty 50",    # NIFTY 50 index
     "NSE_INDEX|Nifty Bank",  # BANK NIFTY index
+    "NSE_INDEX|India VIX",   # India VIX (V3-only instrument)
 ]
 
 SYMBOL_MAP = {
@@ -59,12 +61,43 @@ SYMBOL_MAP = {
     "NSE_EQ|INE467B01029": "INFY",
     "NSE_INDEX|Nifty 50": "NIFTY50",
     "NSE_INDEX|Nifty Bank": "BANKNIFTY",
+    "NSE_INDEX|India VIX": "INDIAVIX",
 }
+
+
+def _ltpc_timestamp(ltpc) -> str:
+    """Prefer exchange tick time when present, otherwise use local receive time."""
+    if getattr(ltpc, "ltt", 0):
+        return datetime.fromtimestamp(ltpc.ltt / 1000, IST).isoformat()
+    return datetime.now(IST).isoformat()
+
+
+def _make_tick(inst_key: str, ltpc, ext_vol=0, ext_oi=0, bid_ask=None) -> dict:
+    """Build a Redis-shaped tick dict from V3 protobuf fields."""
+    timestamp = _ltpc_timestamp(ltpc)
+    return {
+        b"instrument_key": inst_key.encode(),
+        b"symbol": SYMBOL_MAP.get(inst_key, inst_key).encode(),
+        b"ltp": str(ltpc.ltp).encode(),
+        b"volume": str(int(ext_vol)).encode(),
+        b"oi": str(int(ext_oi)).encode(),
+        b"bid_price": str(bid_ask.bidP if bid_ask else 0).encode(),
+        b"ask_price": str(bid_ask.askP if bid_ask else 0).encode(),
+        b"bid_qty": str(int(bid_ask.bidQ) if bid_ask else 0).encode(),
+        b"ask_qty": str(int(bid_ask.askQ) if bid_ask else 0).encode(),
+        b"timestamp": timestamp.encode(),
+        b"source": b"upstox",
+    }
 
 
 def decode_protobuf_tick(binary_data: bytes) -> list[dict]:
     """
-    Decode Upstox protobuf FeedResponse into tick dicts for Redis.
+    Decode Upstox V3 protobuf FeedResponse into tick dicts for Redis.
+
+    V3 structure (vs V2):
+      FeedResponse { type, feeds<map>, currentTs, marketInfo }
+      Feed { oneof { ltpc | fullFeed | firstLevelWithGreeks } }
+      FullFeed { oneof { marketFF | indexFF } }
 
     Falls back gracefully if the compiled proto module isn't available.
     """
@@ -74,53 +107,46 @@ def decode_protobuf_tick(binary_data: bytes) -> list[dict]:
         feed_response = MarketDataFeed_pb2.FeedResponse()
         feed_response.ParseFromString(binary_data)
 
+        # market_info (type=2) carries segment status, not ticks. Skip.
+        if feed_response.type == 2:
+            return []
+
         ticks = []
-        now = datetime.now(IST).isoformat()
-
         for inst_key, feed in feed_response.feeds.items():
-            ff = feed.ff
-            if not ff:
-                continue
+            which = feed.WhichOneof("FeedUnion")
 
-            # Market feed (equities)
-            mf = ff.marketFF
-            # Index feed
-            ixf = ff.indexFF
+            if which == "ltpc":
+                # Pure LTPC-mode subscription
+                ticks.append(_make_tick(inst_key, feed.ltpc))
 
-            if mf and mf.ltpc:
-                ltpc = mf.ltpc
-                bid_ask = mf.marketLevel.bidAskQuote[0] if mf.marketLevel.bidAskQuote else None
-                ext = mf.eFeedDetails
+            elif which == "fullFeed":
+                full = feed.fullFeed
+                inner = full.WhichOneof("FullFeedUnion")
 
-                ticks.append({
-                    b"instrument_key": inst_key.encode(),
-                    b"symbol": SYMBOL_MAP.get(inst_key, inst_key).encode(),
-                    b"ltp": str(ltpc.ltp).encode(),
-                    b"volume": str(int(ext.vol) if ext else 0).encode(),
-                    b"oi": str(int(ext.oi) if ext else 0).encode(),
-                    b"bid_price": str(bid_ask.bp if bid_ask else 0).encode(),
-                    b"ask_price": str(bid_ask.ap if bid_ask else 0).encode(),
-                    b"bid_qty": str(int(bid_ask.bq) if bid_ask else 0).encode(),
-                    b"ask_qty": str(int(bid_ask.aq) if bid_ask else 0).encode(),
-                    b"timestamp": now.encode(),
-                    b"source": b"upstox",
-                })
+                if inner == "marketFF":
+                    mf = full.marketFF
+                    if not mf.ltpc.ltp:
+                        continue
+                    bid_ask = mf.marketLevel.bidAskQuote[0] if mf.marketLevel.bidAskQuote else None
+                    ticks.append(_make_tick(
+                        inst_key, mf.ltpc,
+                        ext_vol=mf.vtt, ext_oi=mf.oi, bid_ask=bid_ask,
+                    ))
+                elif inner == "indexFF":
+                    ixf = full.indexFF
+                    if not ixf.ltpc.ltp:
+                        continue
+                    ticks.append(_make_tick(inst_key, ixf.ltpc))
 
-            elif ixf and ixf.ltpc:
-                ltpc = ixf.ltpc
-                ticks.append({
-                    b"instrument_key": inst_key.encode(),
-                    b"symbol": SYMBOL_MAP.get(inst_key, inst_key).encode(),
-                    b"ltp": str(ltpc.ltp).encode(),
-                    b"volume": b"0",
-                    b"oi": b"0",
-                    b"bid_price": b"0",
-                    b"ask_price": b"0",
-                    b"bid_qty": b"0",
-                    b"ask_qty": b"0",
-                    b"timestamp": now.encode(),
-                    b"source": b"upstox",
-                })
+            elif which == "firstLevelWithGreeks":
+                flwg = feed.firstLevelWithGreeks
+                if not flwg.ltpc.ltp:
+                    continue
+                bid_ask = flwg.firstDepth.bidAskQuote if flwg.firstDepth else None
+                ticks.append(_make_tick(
+                    inst_key, flwg.ltpc,
+                    ext_vol=flwg.vtt, ext_oi=flwg.oi, bid_ask=bid_ask,
+                ))
 
         return ticks
 
@@ -164,45 +190,68 @@ async def produce(instrument_keys: list[str] | None = None) -> None:
     Main producer loop. Runs indefinitely:
         - Waits for token
         - Waits for stream window (9:00 - 15:40 IST on trading days)
-        - Connects to Upstox WebSocket
+        - Connects to Upstox V3 WebSocket
         - Streams ticks to Redis
         - Disconnects at stream end, sleeps until next window
     """
-    instruments = instrument_keys or DEFAULT_INSTRUMENTS
+    instruments = list(instrument_keys or DEFAULT_INSTRUMENTS)
     tick_count = 0
 
     while True:
-        # Step 1: Ensure we have a valid token
+        # Step 1: ensure we have a valid token
         await _wait_for_token()
 
-        # Step 2: Wait for stream window
+        # Step 2: wait for stream window
         wait = seconds_until_stream_start()
         if wait > 0:
-            # Sleep in chunks of 5 min so we can re-check token validity
             logger.info(f"Outside stream window — sleeping {wait:.0f}s until next open")
             while wait > 0:
                 await asyncio.sleep(min(wait, 300))
                 wait = seconds_until_stream_start()
             continue
 
-        # Step 3: Connect and stream
+        # Step 3: connect and stream
         try:
             ws_url = await upstox_auth.get_ws_url()
-            logger.info(f"Connecting to Upstox WebSocket...")
+            logger.info("Connecting to Upstox V3 WebSocket...")
 
             async with websockets.connect(ws_url, ping_interval=30) as ws:
                 await _subscribe(ws, instruments)
                 session_ticks = 0
+                msg_count = 0
 
                 async for message in ws:
+                    msg_count += 1
+
+                    # First-N-message diagnostics so we can tell whether we're
+                    # getting any traffic at all from V3 (and what shape).
+                    if msg_count <= 5:
+                        if isinstance(message, bytes):
+                            logger.info(
+                                "WS msg #%d: %d bytes binary, first 32 bytes hex=%s",
+                                msg_count, len(message), message[:32].hex(),
+                            )
+                        else:
+                            logger.info(
+                                "WS msg #%d: text/json: %s",
+                                msg_count, str(message)[:200],
+                            )
+                    elif msg_count % 500 == 0:
+                        logger.info(
+                            "WS msgs received: %d (binary=%s, ticks parsed so far=%d)",
+                            msg_count, isinstance(message, bytes), session_ticks,
+                        )
+
                     if not is_stream_window():
                         logger.info(f"Stream window closed — session ticks: {session_ticks}")
                         break
 
                     if isinstance(message, bytes):
                         ticks = decode_protobuf_tick(message)
+                        if msg_count <= 5:
+                            logger.info("WS msg #%d decoded into %d ticks", msg_count, len(ticks))
                     else:
-                        logger.debug(f"Non-binary message: {message[:100]}")
+                        logger.info(f"WS non-binary msg #{msg_count}: {str(message)[:200]}")
                         continue
 
                     for tick in ticks:
@@ -210,10 +259,8 @@ async def produce(instrument_keys: list[str] | None = None) -> None:
                         tick_count += 1
                         session_ticks += 1
 
-                    if session_ticks % 500 == 0 and session_ticks > 0:
-                        logger.info(
-                            f"Session: {session_ticks} ticks | Total: {tick_count}"
-                        )
+                    if session_ticks > 0 and session_ticks % 500 == 0:
+                        logger.info(f"Session: {session_ticks} ticks | Total: {tick_count}")
 
         except websockets.ConnectionClosed as exc:
             logger.warning(f"WebSocket closed ({exc.code}): {exc.reason}. Reconnecting in 5s...")

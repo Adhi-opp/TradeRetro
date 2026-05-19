@@ -1,7 +1,177 @@
 import { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, AlertCircle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle, Clock, TrendingUp, Layers, Activity } from 'lucide-react';
 
 const API = 'http://localhost:8000/api';
+
+function fmtAge(iso) {
+  if (!iso) return '—';
+  const sec = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (sec < 60) return `${Math.round(sec)}s ago`;
+  if (sec < 3600) return `${Math.round(sec / 60)}m ago`;
+  if (sec < 86400) return `${(sec / 3600).toFixed(1)}h ago`;
+  return `${Math.round(sec / 86400)}d ago`;
+}
+
+function QualityWarnings() {
+  const [audit, setAudit] = useState(null);
+  const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchAudit = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/quality/audit?recent=false`);
+      if (!r.ok) { setErr(`HTTP ${r.status}`); return; }
+      setAudit(await r.json());
+      setErr(null);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchAudit();
+    const iv = setInterval(fetchAudit, 60000);
+    return () => clearInterval(iv);
+  }, [fetchAudit]);
+
+  if (err) return <div className="dq-error">Quality audit: {err}</div>;
+  if (!audit) return null;
+
+  const { summary, results } = audit;
+  const flagged = results.filter((r) => r.severity !== 'ok' && r.severity !== 'info');
+  const allClean = flagged.length === 0;
+
+  const sevPalette = {
+    critical: { color: '#ef4444', label: 'CRITICAL' },
+    error:    { color: '#ef4444', label: 'ERROR' },
+    warning:  { color: '#f59e0b', label: 'WARN' },
+    info:     { color: '#60a5fa', label: 'INFO' },
+  };
+
+  return (
+    <div className="quality-warnings">
+      <div className="quality-warnings-header">
+        <AlertCircle size={14} />
+        <span>Quality Gate</span>
+        <span className="quality-summary-pill" style={{ borderColor: allClean ? '#00c9a7' : '#f59e0b' }}>
+          {summary.critical > 0 && <span style={{ color: '#ef4444' }}>{summary.critical} critical · </span>}
+          {summary.warnings > 0 && <span style={{ color: '#f59e0b' }}>{summary.warnings} warn · </span>}
+          {summary.info > 0 && <span style={{ color: '#60a5fa' }}>{summary.info} info · </span>}
+          <span style={{ color: '#00c9a7' }}>{summary.ok} clean</span>
+        </span>
+        <button onClick={fetchAudit} disabled={loading} className="quality-refresh">
+          <RefreshCw size={11} className={loading ? 'spin-icon' : ''} />
+        </button>
+      </div>
+
+      {allClean ? (
+        <div className="quality-clean">
+          <CheckCircle size={14} /> All {summary.total_tickers} tickers pass hard checks. No stale data, no gaps beyond NSE holidays.
+        </div>
+      ) : (
+        <div className="quality-flagged">
+          {flagged.map((r) => {
+            const pal = sevPalette[r.severity] || sevPalette.info;
+            const issues = [];
+            if (r.hard_failures?.length) issues.push(`${r.hard_failures.length} hard fail${r.hard_failures.length > 1 ? 's' : ''}`);
+            if (r.soft_warnings?.length) issues.push(`${r.soft_warnings.length} soft warn${r.soft_warnings.length > 1 ? 's' : ''}`);
+            if (r.gap_count > 0) issues.push(`${r.gap_count} date gap${r.gap_count > 1 ? 's' : ''}`);
+            if (r.stale) issues.push(`stale ${r.days_behind}d`);
+            return (
+              <div key={r.ticker} className="quality-row" style={{ borderLeftColor: pal.color }}>
+                <span className="quality-row-sev" style={{ color: pal.color }}>{pal.label}</span>
+                <span className="quality-row-ticker">{r.ticker}</span>
+                <span className="quality-row-issues">{issues.join(' · ')}</span>
+                {r.gap_sample?.length > 0 && (
+                  <span className="quality-row-sample">e.g. {r.gap_sample.slice(0, 3).join(', ')}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MedallionHealth() {
+  const [snap, setSnap] = useState(null);
+  const [err, setErr] = useState(null);
+
+  const fetchSnap = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/health/pipeline`);
+      if (!r.ok) { setErr(`HTTP ${r.status}`); return; }
+      setSnap(await r.json());
+      setErr(null);
+    } catch (e) { setErr(e.message); }
+  }, []);
+
+  useEffect(() => {
+    fetchSnap();
+    const iv = setInterval(fetchSnap, 5000);
+    return () => clearInterval(iv);
+  }, [fetchSnap]);
+
+  if (err) return <div className="dq-error">Pipeline health: {err}</div>;
+  if (!snap) return <div className="dq-empty">Loading pipeline health…</div>;
+
+  const tickRate = snap.bronze?.ticks_per_minute ?? 0;
+  const isFlowing = tickRate > 0;
+
+  return (
+    <div className="medallion-health">
+      <div className="medallion-header">
+        <Layers size={14} />
+        <span>Medallion Pipeline Health</span>
+        <span className={`pulse-dot ${isFlowing ? 'on' : 'off'}`} />
+        <span className="medallion-rate">
+          {isFlowing
+            ? `${tickRate} ticks/min · ${snap.redis_latest_symbols} symbols live`
+            : 'No live ticks'}
+        </span>
+      </div>
+      <div className="medallion-grid">
+        <div className="medallion-card bronze">
+          <div className="medallion-card-label">Bronze · raw ticks</div>
+          <div className="medallion-card-value">{(snap.bronze?.rows ?? 0).toLocaleString()}</div>
+          <div className="medallion-card-sub">
+            {snap.bronze?.instruments ?? 0} instruments · last {fmtAge(snap.bronze?.latest_ts)}
+          </div>
+          <div className="medallion-card-meta">{snap.bronze?.table}</div>
+        </div>
+        <div className="medallion-card silver">
+          <div className="medallion-card-label">Silver · 1-min OHLCV</div>
+          <div className="medallion-card-value">{(snap.silver?.bars ?? 0).toLocaleString()}</div>
+          <div className="medallion-card-sub">
+            {snap.silver?.instruments ?? 0} instruments · last {fmtAge(snap.silver?.latest_bucket)}
+          </div>
+          <div className="medallion-card-meta">{snap.silver?.table}</div>
+        </div>
+        <div className="medallion-card gold">
+          <div className="medallion-card-label">Gold · 5-min rollup</div>
+          <div className="medallion-card-value">{(snap.gold_5min?.bars ?? 0).toLocaleString()}</div>
+          <div className="medallion-card-sub">last {fmtAge(snap.gold_5min?.latest_bucket)}</div>
+          <div className="medallion-card-meta">{snap.gold_5min?.view}</div>
+        </div>
+        <div className="medallion-card gold">
+          <div className="medallion-card-label">Gold · daily rollup</div>
+          <div className="medallion-card-value">{(snap.gold_daily?.bars ?? 0).toLocaleString()}</div>
+          <div className="medallion-card-sub">last {snap.gold_daily?.latest_bucket ?? '—'}</div>
+          <div className="medallion-card-meta">{snap.gold_daily?.view}</div>
+        </div>
+        <div className="medallion-card raw">
+          <div className="medallion-card-label">Raw · EOD warehouse</div>
+          <div className="medallion-card-value">{(snap.raw?.rows ?? 0).toLocaleString()}</div>
+          <div className="medallion-card-sub">
+            {snap.raw?.tickers ?? 0} tickers · through {snap.raw?.latest_date ?? '—'}
+          </div>
+          <div className="medallion-card-meta">{snap.raw?.table}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function QualityBadge({ status, text }) {
   const colour = {
@@ -55,13 +225,16 @@ export default function DataQualityDashboard() {
       const totalRows = data.reduce((sum, t) => sum + (t.row_count || 0), 0);
       const avgRowCount = totalTickers > 0 ? Math.round(totalRows / totalTickers) : 0;
 
-      // Staleness: most recent backfill
-      const recentBackfills = data
-        .map((t) => t.last_backfill_at)
+      // Staleness: latest EOD trade_date across the universe. Using
+      // `latest_date` (the actual data freshness) instead of `last_backfill_at`
+      // (the metadata column that's null for tickers added before the audit
+      // trail was wired up).
+      const latestDates = data
+        .map((t) => t.latest_date)
         .filter(Boolean)
         .sort()
         .reverse();
-      const mostRecentBackfill = recentBackfills[0];
+      const mostRecentBackfill = latestDates[0];
       const daysSinceMostRecent = mostRecentBackfill
         ? Math.floor((Date.now() - new Date(mostRecentBackfill).getTime()) / (1000 * 60 * 60 * 24))
         : null;
@@ -114,6 +287,9 @@ export default function DataQualityDashboard() {
 
       {error && <div className="dq-error">Error: {error}</div>}
 
+      <MedallionHealth />
+      <QualityWarnings />
+
       {/* Summary Stats */}
       <div className="dq-stats-grid">
         <div className="dq-stat-card">
@@ -164,8 +340,8 @@ export default function DataQualityDashboard() {
             </thead>
             <tbody>
               {sortedUniverse.map((t) => {
-                const daysStale = t.last_backfill_at
-                  ? Math.floor((Date.now() - new Date(t.last_backfill_at).getTime()) / (1000 * 60 * 60 * 24))
+                const daysStale = t.latest_date
+                  ? Math.floor((Date.now() - new Date(t.latest_date).getTime()) / (1000 * 60 * 60 * 24))
                   : null;
 
                 const freshnessStatus =

@@ -58,7 +58,9 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@timescaledb:5432/traderetro_raw
       REDIS_URL: redis://redis:6379
-      PIPELINE_MODE: live
+      # Mode comes from .env (defaults to simulate). Set PIPELINE_MODE=live
+      # in .env when you want the real Upstox V3 WebSocket producer.
+      PIPELINE_MODE: ${PIPELINE_MODE:-simulate}
       PREFECT_API_URL: http://prefect-server:4200/api
     command: ["python", "-m", "pipeline.worker"]
     depends_on:
@@ -75,6 +77,7 @@ services:
       - "4200:4200"
     environment:
       PREFECT_SERVER_API_HOST: "0.0.0.0"
+      PREFECT_UI_API_URL: "http://localhost:4200/api"
       PREFECT_API_DATABASE_CONNECTION_URL: "sqlite+aiosqlite:////data/prefect.db"
     volumes:
       - prefect_data:/data

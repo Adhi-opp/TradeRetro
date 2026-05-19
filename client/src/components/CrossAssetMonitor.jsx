@@ -45,7 +45,7 @@ const fmtNum = (v, d = 2) => {
 // Keeps chronological axes scannable vs. a row of ISO dates that blur together.
 const fmtDateTick = (d) => {
   if (!d) return '';
-  const [y, m, day] = String(d).split('-');
+  const [, m, day] = String(d).split('-');
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mi = Number(m) - 1;
   if (Number.isNaN(mi) || mi < 0 || mi > 11) return d;
@@ -331,6 +331,7 @@ function PriceChartPanel({ symbol, refreshSignal }) {
   const first = data.length ? data[0].close : null;
   const delta = last && first ? ((last - first) / first) * 100 : 0;
   const up = delta >= 0;
+  const lastIsLive = data.length ? data[data.length - 1].live === true : false;
   const gradId = `grad-${symbol.replace(/[^a-z0-9]/gi, '')}`;
 
   return (
@@ -352,7 +353,10 @@ function PriceChartPanel({ symbol, refreshSignal }) {
       }
     >
       <div className="chart-summary">
-        <div className="chart-summary-last" style={{ color: meta.accent }}>{fmtNum(last)}</div>
+        <div className="chart-summary-last" style={{ color: meta.accent }}>
+          {fmtNum(last)}
+          {lastIsLive && <span className="chart-live-badge">LIVE</span>}
+        </div>
         <div className={`chart-summary-delta ${up ? 'up' : 'down'}`}>
           {up ? '▲' : '▼'} {up ? '+' : ''}{delta.toFixed(2)}% <span className="muted">/ period</span>
         </div>
@@ -772,7 +776,7 @@ export default function CrossAssetMonitor() {
       <div className="ca-hero">
         <div className="ca-hero-left">
           <h1>Cross-Asset Monitor</h1>
-          <span className="ca-hero-sub">Live EOD quotes · volatility regime · correlation analytics</span>
+          <span className="ca-hero-sub">Live ticks · volatility regime · correlation analytics</span>
         </div>
         <div className="ca-hero-right">
           <div className="ca-hero-sync">

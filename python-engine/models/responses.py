@@ -98,34 +98,3 @@ class BacktestResponse(BaseModel):
     trades: list[TradeRecord]
     strategy: dict
     simulationMeta: SimulationMeta
-
-
-class DistributionStats(BaseModel):
-    mean: float
-    median: float
-    stdDev: float
-    min: float
-    max: float
-    percentile5: float
-    percentile25: float
-    percentile75: float
-    percentile95: float
-    positiveRuns: int
-    totalRuns: int
-
-
-class MonteCarloRunResult(BaseModel):
-    seed: int
-    totalReturn: float
-    maxDrawdown: float
-    winRate: float
-    sharpeRatio: float
-    totalTrades: int
-    cagr: float
-    alpha: float
-
-
-class MonteCarloResponse(BaseModel):
-    distribution: DistributionStats
-    runs: list[MonteCarloRunResult]
-    executionTimeMs: float

@@ -3,7 +3,6 @@ import StrategyForm from './StrategyForm';
 
 export default function LeftPane({
   onRunBacktest,
-  onRunMonteCarlo,
   loading,
   error,
 }) {
@@ -23,7 +22,6 @@ export default function LeftPane({
         {loading && <div className="left-pane-overlay" />}
         <StrategyForm
           onRunBacktest={onRunBacktest}
-          onRunMonteCarlo={onRunMonteCarlo}
           isLoading={loading}
         />
         {error && (

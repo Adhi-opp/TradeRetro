@@ -10,6 +10,7 @@ from config import settings
 _redis: aioredis.Redis | None = None
 
 TICK_STREAM = "market:ticks"
+LATEST_TICK_HASH = "market:latest"  # HSET symbol -> json(tick) for O(1) /quotes lookup
 CONSUMER_GROUP = "tick-consumers"
 MAX_STREAM_LEN = 500_000  # Cap stream at 500k entries (~24h of data)
 
@@ -38,9 +39,63 @@ def get_redis() -> aioredis.Redis:
 
 
 async def xadd_tick(tick: dict) -> bytes:
-    """Push a tick to the market:ticks stream. Returns the message ID."""
+    """
+    Push a tick to the market:ticks stream AND mirror it to the
+    market:latest hash keyed by symbol, so /api/live/quotes can fetch
+    fresh prices in O(1) without scanning the stream.
+    """
     r = get_redis()
-    return await r.xadd(TICK_STREAM, tick, maxlen=MAX_STREAM_LEN, approximate=True)
+    pipe = r.pipeline(transaction=False)
+    pipe.xadd(TICK_STREAM, tick, maxlen=MAX_STREAM_LEN, approximate=True)
+    symbol = tick.get(b"symbol") or tick.get("symbol")
+    if symbol:
+        sym_key = symbol.decode() if isinstance(symbol, bytes) else str(symbol)
+        flat = {
+            (k.decode() if isinstance(k, bytes) else str(k)):
+            (v.decode() if isinstance(v, bytes) else str(v))
+            for k, v in tick.items()
+        }
+        pipe.hset(LATEST_TICK_HASH, sym_key, _json_dumps(flat))
+    msg_id, *_ = await pipe.execute()
+    return msg_id
+
+
+def _json_dumps(obj: dict) -> str:
+    import json
+    return json.dumps(obj, separators=(",", ":"))
+
+
+async def latest_quote(symbol: str) -> dict | None:
+    """Return the most recent tick dict for `symbol`, or None if absent."""
+    import json
+    r = get_redis()
+    raw = await r.hget(LATEST_TICK_HASH, symbol)
+    if not raw:
+        return None
+    payload = raw.decode() if isinstance(raw, bytes) else raw
+    try:
+        return json.loads(payload)
+    except (ValueError, TypeError):
+        return None
+
+
+async def latest_quotes(symbols: list[str]) -> dict[str, dict]:
+    """Batch lookup — returns {symbol: tick_dict} for symbols present."""
+    import json
+    if not symbols:
+        return {}
+    r = get_redis()
+    raw_values = await r.hmget(LATEST_TICK_HASH, symbols)
+    out: dict[str, dict] = {}
+    for sym, raw in zip(symbols, raw_values):
+        if not raw:
+            continue
+        try:
+            payload = raw.decode() if isinstance(raw, bytes) else raw
+            out[sym] = json.loads(payload)
+        except (ValueError, TypeError):
+            continue
+    return out
 
 
 async def ensure_consumer_group() -> None:

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Terminal, BarChart3, LineChart, PieChart, List } from 'lucide-react';
+import { Terminal, BarChart3, LineChart, PieChart, List, Grid3x3 } from 'lucide-react';
 import EquityChart from './EquityChart';
 import TradeTable from './TradeTable';
 import ErrorBoundary from './ErrorBoundary';
@@ -10,6 +10,7 @@ import DrawdownChart from './DrawdownChart';
 import MonthlyHeatmap from './MonthlyHeatmap';
 import ReturnDistribution from './ReturnDistribution';
 import TradeStats from './TradeStats';
+import ParameterSweep from './ParameterSweep';
 import { analyze } from '../utils/performance';
 
 function ExecutionWarning({ metadata }) {
@@ -66,71 +67,14 @@ function CostBreakdown({ costs }) {
   );
 }
 
-function MonteCarloResults({ data }) {
-  if (!data || !data.distribution) return null;
-  const d = data.distribution;
-  const barData = data.runs.map((r) => r.totalReturn).sort((a, b) => a - b);
-  const bucketCount = 12;
-  const min = barData[0];
-  const max = barData[barData.length - 1];
-  const bucketSize = (max - min) / bucketCount || 1;
-  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
-    range: `${(min + i * bucketSize).toFixed(0)}%`,
-    count: 0,
-  }));
-  barData.forEach((v) => {
-    const idx = Math.min(Math.floor((v - min) / bucketSize), bucketCount - 1);
-    buckets[idx].count++;
-  });
-  const maxCount = Math.max(...buckets.map((b) => b.count));
-
-  return (
-    <div className="results-container">
-      <div className="panel monte-carlo-panel">
-        <div className="panel-title-row">
-          <span className="panel-title">Monte Carlo Distribution</span>
-          <span className="panel-sub">{d.totalRuns} runs &middot; {data.executionTimeMs}ms</span>
-        </div>
-
-        <div className="mc-stats-grid">
-          <div className="mc-stat">
-            <span className="mc-stat-label">Mean Return</span>
-            <span className={'mc-stat-value ' + (d.mean >= 0 ? 'positive' : 'negative')}>{d.mean.toFixed(2)}%</span>
-          </div>
-          <div className="mc-stat"><span className="mc-stat-label">Median</span><span className="mc-stat-value">{d.median.toFixed(2)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">Std Dev</span><span className="mc-stat-value">{d.stdDev.toFixed(2)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">Best Case</span><span className="mc-stat-value positive">{d.max.toFixed(2)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">Worst Case</span><span className="mc-stat-value negative">{d.min.toFixed(2)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">Win Rate</span><span className="mc-stat-value">{Math.round((d.positiveRuns / d.totalRuns) * 100)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">5th Pctl</span><span className="mc-stat-value negative">{d.percentile5.toFixed(2)}%</span></div>
-          <div className="mc-stat"><span className="mc-stat-label">95th Pctl</span><span className="mc-stat-value positive">{d.percentile95.toFixed(2)}%</span></div>
-        </div>
-
-        <div className="mc-histogram">
-          <div className="mc-histogram-label">Return Distribution across {d.totalRuns} stochastic runs</div>
-          <div className="mc-histogram-bars">
-            {buckets.map((b, i) => (
-              <div key={i} className="mc-bar-col">
-                <div className="mc-bar" style={{ height: `${maxCount > 0 ? (b.count / maxCount) * 100 : 0}%` }} />
-                <span className="mc-bar-label">{b.range}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function RightPane({
-  mode, result, monteCarloResult, loading, error, applyCosts, theme,
+  mode, result, loading, error, applyCosts, theme,
   backtestTicker, strategyParams, backtestRange,
 }) {
   const [activeTab, setActiveTab] = useState('performance');
   const isManual = mode === 'manual';
   const hasManualResults = isManual && !loading && result && result.metrics;
-  const hasMonteCarloResults = isManual && !loading && monteCarloResult;
-  const isIdle = !loading && !hasManualResults && !hasMonteCarloResults;
+  const isIdle = !loading && !hasManualResults;
 
   const analytics = useMemo(
     () => (hasManualResults ? analyze(result, applyCosts) : null),
@@ -175,6 +119,15 @@ export default function RightPane({
             <LineChart size={14} />
             <span>Price Chart</span>
           </button>
+          <button
+            className={`right-pane-tab ${activeTab === 'sweep' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sweep')}
+            disabled={!hasManualResults}
+            title="Parameter sweep — vary 2 params, find robust sweet spot"
+          >
+            <Grid3x3 size={14} />
+            <span>Sweep</span>
+          </button>
         </div>
         {loading && <span className="right-pane-status pulse-dot">Running simulation&hellip;</span>}
       </div>
@@ -182,7 +135,7 @@ export default function RightPane({
       {/* Price Chart tab */}
       {activeTab === 'chart' && (
         <div className="right-pane-scroll right-pane-chart">
-          <ExecutionWarning metadata={result?.metadata || monteCarloResult?.metadata} />
+          <ExecutionWarning metadata={result?.metadata} />
           <ChartWidget
             theme={theme}
             ticker={backtestTicker}
@@ -190,6 +143,8 @@ export default function RightPane({
             backtestTicker={backtestTicker}
             strategyParams={strategyParams}
             dateRange={backtestRange}
+            equityCurve={result?.equityCurve || null}
+            showCosts={applyCosts}
           />
         </div>
       )}
@@ -288,10 +243,32 @@ export default function RightPane({
             </div>
           )}
 
-          {hasMonteCarloResults && (
-            <ErrorBoundary fallbackTitle="Monte Carlo Failed" fallbackMessage="Could not display distribution.">
-              <MonteCarloResults data={monteCarloResult} />
-            </ErrorBoundary>
+          {/* Manual - Parameter Sweep tab */}
+          {hasManualResults && activeTab === 'sweep' && (
+            <div className="results-container">
+              <SummaryRibbon
+                metrics={metrics}
+                ticker={backtestTicker}
+                strategy={strategyParams}
+                range={backtestRange}
+              />
+              <ErrorBoundary fallbackTitle="Sweep Failed" fallbackMessage="Could not render parameter sweep.">
+                <ParameterSweep
+                  ticker={backtestTicker}
+                  strategyType={strategyParams?.strategyType}
+                  baseParams={{
+                    initialCapital: metrics?.initialCapital || 100000,
+                    // Strategy-specific defaults — used for the params NOT being swept
+                    shortPeriod: strategyParams?.fastSma,
+                    longPeriod: strategyParams?.slowSma,
+                    rsiPeriod: strategyParams?.rsiPeriod,
+                    oversold: strategyParams?.oversold,
+                    overbought: strategyParams?.overbought,
+                  }}
+                  dateRange={backtestRange}
+                />
+              </ErrorBoundary>
+            </div>
           )}
         </div>
       )}
