@@ -113,7 +113,7 @@ Built as a Data Engineering portfolio project demonstrating production-grade str
 | **Real-Time Streaming ETL** | Upstox V3 WebSocket → Redis Streams → consumer worker → bronze hypertable |
 | **Consumer Groups** | Redis `XREADGROUP` with at-least-once delivery, `XACK` after successful insert |
 | **Idempotent Upserts** | `ON CONFLICT DO NOTHING` (bronze) / `DO UPDATE` (silver) — re-aggregating same bucket is safe |
-| **Watermark-Based CDC** | `ops.data_catalog.high_watermark` drives EOD incremental loads |
+| **Watermark-Driven Incremental Ingestion** | `ops.data_catalog.high_watermark` drives EOD incremental loads — polling-based, not log-based CDC |
 | **Data Quality Gates** | Hard checks (OHLCV invariants, nulls) + soft checks (outliers, staleness) + gap detection using NIFTY50 as empirical NSE calendar |
 | **DAG Orchestration** | Prefect flows: EOD pipeline, historical backfill, quality audit |
 | **In-Process Scheduling** | Async scheduler inside FastAPI lifespan — invokes Prefect flows weekdays at 16:00 IST without a separate work pool |
@@ -331,6 +331,7 @@ The same Redis-first logic is used by `/api/live/vix` and (for chart series) `/a
 |--------|----------|-------------|
 | `POST` | `/api/backtest` | Vectorized backtest (MA Crossover, RSI, MACD, Bollinger, ORB, VWAP, Donchian) |
 | `POST` | `/api/backtest/sweep` | Parameter sweep — vary 2 params, returns 2D metric grid |
+| `GET` | `/api/signals/unified/{ticker}` | Strategy-aware indicators (RSI, MACD, Bollinger, Donchian, VWAP, arbitrary SMA periods) attached to a price series — drives the Backtest chart overlays |
 
 ### Live Market Data
 | Method | Endpoint | Description |
@@ -460,7 +461,7 @@ Grafana is configured for anonymous read access + iframe embedding (used in the 
 TradeRetro/
 ├── docker-compose.yml              # 7-service orchestration
 ├── .env.example                    # Environment template
-├── README.md
+├── README_TR.md
 │
 ├── python-engine/
 │   ├── main.py                     # FastAPI app + lifespan (DB pool, Redis, EOD scheduler)
@@ -471,6 +472,7 @@ TradeRetro/
 │   ├── routers/                    # API endpoints
 │   │   ├── backtest.py
 │   │   ├── live.py                 # /api/live/{quotes,prices,vix,signals}
+│   │   ├── signals.py              # /api/signals/unified/{ticker} — strategy-aware indicators
 │   │   ├── quality.py              # /api/quality/audit + /audit/{ticker}
 │   │   ├── correlation.py
 │   │   ├── ingestion.py
