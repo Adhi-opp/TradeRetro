@@ -29,6 +29,7 @@ class BacktestMetrics(BaseModel):
     winRate: float
     avgProfitLoss: float
     avgHoldingPeriod: float
+    exposurePct: float
     startDate: str
     endDate: str
     totalDays: int
@@ -80,6 +81,7 @@ class TradeRecord(BaseModel):
     isWin: bool
     isGrossWin: bool
     forceClose: bool
+    exitReason: str  # "signal" | "stop" | "force_close"
 
 
 class SimulationMeta(BaseModel):

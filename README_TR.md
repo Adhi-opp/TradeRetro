@@ -69,7 +69,7 @@ Built as a Data Engineering portfolio project demonstrating production-grade str
    │  SERVING                                                                │
    │                                                                         │
    │   FastAPI (port 8000) — single-process async, asyncpg pool              │
-   │     /api/backtest           Vectorized backtest (7 strategies)          │
+   │     /api/backtest           Vectorized backtest (5 strategies)          │
    │     /api/live/quotes        Redis-first LTP with EOD fallback           │
    │     /api/live/vix           India VIX + regime band (Redis-first)       │
    │     /api/live/prices/{sym}  EOD series + live intraday tail             │
@@ -329,9 +329,9 @@ The same Redis-first logic is used by `/api/live/vix` and (for chart series) `/a
 ### Backtesting
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/backtest` | Vectorized backtest (MA Crossover, RSI, MACD, Bollinger, ORB, VWAP, Donchian) |
+| `POST` | `/api/backtest` | Vectorized backtest (MA Crossover, RSI, MACD, Bollinger, Donchian) — next-bar-open fills |
 | `POST` | `/api/backtest/sweep` | Parameter sweep — vary 2 params, returns 2D metric grid |
-| `GET` | `/api/signals/unified/{ticker}` | Strategy-aware indicators (RSI, MACD, Bollinger, Donchian, VWAP, arbitrary SMA periods) attached to a price series — drives the Backtest chart overlays |
+| `GET` | `/api/signals/unified/{ticker}` | Strategy-aware indicators (RSI, MACD, Bollinger, Donchian, arbitrary SMA periods) attached to a price series — drives the Backtest chart overlays |
 
 ### Live Market Data
 | Method | Endpoint | Description |
@@ -393,15 +393,24 @@ The same Redis-first logic is used by `/api/live/vix` and (for chart series) `/a
 
 ### Supported Strategies
 
+Five strategies that are statistically meaningful on **daily** bars. (Intraday-only
+strategies — Opening Range Breakout, session-anchored VWAP reversion — were
+deliberately removed: they produce meaningless signals on daily EOD data and
+belong in a separate intraday engine, not bolted onto the daily evaluator.)
+
 | Strategy | Signal | Key Parameters |
 |----------|--------|----------------|
 | Moving Average Crossover | Golden / death cross | Short period, long period |
 | RSI | Overbought / oversold | Period, overbought, oversold |
 | MACD | Signal-line crossover | Fast, slow, signal periods |
 | Bollinger Breakout | Band break + reentry | Period, std dev |
-| Opening Range Breakout (ORB) | Break of first-N-bars range | Range duration |
-| VWAP Mean Reversion | Distance from session VWAP | Reversion % |
-| Donchian Breakout | Highest-high / lowest-low channel | Channel period |
+| Donchian Breakout | Close breaks the **prior** N-day high / low (channel is `shift(1)`'d so the current bar is excluded) | Channel period |
+
+### Execution Model
+
+Signals are computed on a bar's **close**, but orders fill at the **next bar's
+open** — you can't trade at a close you only learn once the bar is over. This
+removes same-bar look-ahead bias. A signal on the final bar simply never fills.
 
 ### Cost Model
 
@@ -416,7 +425,7 @@ Computed in the browser from the equity curve + trade log (no extra round-trip):
 ## Frontend (React)
 
 ### Backtest Tab
-- Strategy config (7 strategies, full parameter exposure)
+- Strategy config (5 strategies, full parameter exposure)
 - Live ticker autocomplete with yfinance metadata
 - Equity curve + drawdown plot
 - Monthly returns heatmap, return distribution
@@ -482,7 +491,7 @@ TradeRetro/
 │   │
 │   ├── engine/                     # Vectorized backtest engine
 │   │   ├── simulation.py
-│   │   ├── strategies.py           # 7 strategies
+│   │   ├── strategies.py           # 5 daily strategies
 │   │   ├── indicators.py
 │   │   ├── costs.py                # Indian equity cost model
 │   │   ├── metrics.py

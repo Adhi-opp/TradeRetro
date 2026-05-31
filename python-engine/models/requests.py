@@ -15,16 +15,18 @@ STRATEGY_TYPES = Literal[
     "RSI",
     "MACD",
     "BOLLINGER_BREAKOUT",
-    "ORB",
-    "VWAP_REVERSION",
     "DONCHIAN_BREAKOUT",
 ]
 
 
 class BacktestRequest(BaseModel):
     """
-    Backtest request payload — matches Express POST /api/backtest body.
-    Supports all 7 strategies wired up in engine/simulation.py.
+    Backtest request payload — matches the POST /api/backtest body.
+
+    Supports the 5 daily-timeframe strategies wired up in
+    engine/simulation.py. (Intraday-only strategies — ORB, session-VWAP
+    reversion — were removed: they are statistically meaningless on daily
+    EOD bars and belong in a separate intraday engine.)
     """
     symbol: str
     strategyType: STRATEGY_TYPES
@@ -52,6 +54,19 @@ class BacktestRequest(BaseModel):
             raise ValueError("params.initialCapital is required")
         if not isinstance(ic, (int, float)) or ic < 100 or ic > 1e8:
             raise ValueError("initialCapital must be between 100 and 100,000,000")
+
+        # Optional risk model — applies to every strategy. riskPct and
+        # stopLossPct must be supplied together (one without the other is
+        # ambiguous: risk sizing needs a stop to define the risk).
+        risk = p.get("riskPct")
+        stop = p.get("stopLossPct")
+        if (risk is None) != (stop is None):
+            raise ValueError("riskPct and stopLossPct must be provided together")
+        if risk is not None:
+            if not isinstance(risk, (int, float)) or risk <= 0 or risk > 0.5:
+                raise ValueError("riskPct must be between 0 (exclusive) and 0.5")
+            if not isinstance(stop, (int, float)) or stop <= 0 or stop > 0.5:
+                raise ValueError("stopLossPct must be between 0 (exclusive) and 0.5")
 
         if st == "MOVING_AVERAGE_CROSSOVER":
             sp = p.get("shortPeriod")
@@ -110,20 +125,6 @@ class BacktestRequest(BaseModel):
             if not isinstance(dp, int) or dp < 5 or dp > 200:
                 raise ValueError("dcPeriod must be an integer between 5 and 200")
 
-        elif st == "VWAP_REVERSION":
-            rp = p.get("reversionPct")
-            if rp is None:
-                raise ValueError("params.reversionPct is required")
-            if not isinstance(rp, (int, float)) or rp < 0.001 or rp > 0.1:
-                raise ValueError("reversionPct must be between 0.001 and 0.1")
-
-        elif st == "ORB":
-            om = p.get("orbMinutes", 30)
-            if not isinstance(om, int) or om < 5 or om > 180:
-                raise ValueError("orbMinutes must be an integer between 5 and 180")
-            # Note: ORB is intraday-only; daily EOD data won't produce
-            # meaningful signals. The engine still runs without error.
-
         return self
 
     def min_candles(self) -> int:
@@ -139,7 +140,7 @@ class BacktestRequest(BaseModel):
         if st == "BOLLINGER_BREAKOUT":
             return p["bbPeriod"]
         if st == "DONCHIAN_BREAKOUT":
-            return p["dcPeriod"]
-        if st in ("VWAP_REVERSION", "ORB"):
-            return 20  # modest warm-up for sanity
+            # +1: the channel uses the prior N bars (shift(1)), so the first
+            # breakout can only be evaluated on bar N+1.
+            return p["dcPeriod"] + 1
         return 0

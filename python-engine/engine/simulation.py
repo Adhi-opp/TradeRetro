@@ -16,12 +16,11 @@ import numpy as np
 from engine.costs import create_seeded_rng, calculate_indian_costs
 from engine.indicators import (
     compute_rsi, compute_macd, compute_sma, compute_bollinger_bands,
-    compute_vwap, compute_donchian_channel,
+    compute_donchian_channel,
 )
 from engine.strategies import (
     evaluate_ma_crossover, evaluate_rsi, evaluate_macd,
-    evaluate_bollinger_breakout, evaluate_orb, evaluate_vwap_reversion,
-    evaluate_donchian_breakout,
+    evaluate_bollinger_breakout, evaluate_donchian_breakout,
 )
 from engine import metrics as m
 
@@ -57,8 +56,10 @@ class SimulationEngine:
         self.initial_capital = initial_capital
         self.strategy_config = strategy_config
 
+        params = strategy_config.get("params", {})
+
         # Seeded RNG
-        seed = strategy_config.get("params", {}).get("seed")
+        seed = params.get("seed")
         if seed is not None:
             self.rng = create_seeded_rng(seed)
         else:
@@ -66,11 +67,20 @@ class SimulationEngine:
             self.rng = random.random
         self.seed = seed
 
+        # Risk model (optional). When both are set, positions are sized so a
+        # stop-out costs exactly `risk_pct` of equity:
+        #     position_value = (risk_pct * equity) / stop_loss_pct
+        # When unset, the engine falls back to all-in / no-stop (legacy).
+        self.risk_pct = params.get("riskPct")          # e.g. 0.02 = risk 2%/trade
+        self.stop_loss_pct = params.get("stopLossPct")  # e.g. 0.05 = 5% stop
+        self.risk_managed = bool(self.risk_pct and self.stop_loss_pct)
+
         # Portfolio state
         self.cash = initial_capital
         self.holdings = 0
         self.entry_price = None
         self.entry_date = None
+        self.stop_price = None  # active stop level while holding (risk model)
 
         # Results tracking
         self.trades = []
@@ -90,14 +100,41 @@ class SimulationEngine:
         self.gross_max_drawdown = 0.0
 
     def run(self) -> dict:
-        """Execute the backtest and return the full report."""
+        """
+        Execute the backtest and return the full report.
+
+        Execution model — NEXT-BAR-OPEN fills (no look-ahead):
+          A signal is computed from candle[i]'s CLOSE, but the order is not
+          filled on the same bar — you can't trade at a close you only learn
+          once the bar is over. Instead the order is queued and filled at
+          candle[i+1]'s OPEN. A signal on the final bar simply never fills,
+          which is the honest outcome.
+        """
         close_prices = np.array([c["close"] for c in self.market_data], dtype=np.float64)
         indicators = self._calculate_indicators(close_prices)
+
+        pending_signal = None  # "BUY" | "SELL" | None — queued from prior bar
 
         for i, candle in enumerate(self.market_data):
             if i < self.visible_start_index:
                 continue
 
+            # 1. Fill any order queued on the previous bar, at THIS bar's open.
+            if pending_signal == "BUY" and self.holdings == 0 and self.cash > 0:
+                self._execute_buy(candle["open"], candle["date"])
+            elif pending_signal == "SELL" and self.holdings > 0:
+                self._execute_sell(candle["open"], candle["date"])
+            pending_signal = None
+
+            # 1b. Stop-loss (risk model). A stop is a resting order placed at
+            # entry, so it can fill on the SAME bar — that's not look-ahead.
+            # If the bar gapped open below the stop, fill at the open (worse);
+            # otherwise fill at the stop level.
+            if self.holdings > 0 and self.stop_price is not None and candle["low"] <= self.stop_price:
+                fill = min(candle["open"], self.stop_price)
+                self._execute_sell(fill, candle["date"], exit_reason="stop")
+
+            # 2. Mark-to-market at this bar's close (after any fill above).
             portfolio_value = self._portfolio_value(candle)
             gross_equity = portfolio_value + self.total_costs["grossTotal"]
 
@@ -113,16 +150,18 @@ class SimulationEngine:
             self._update_drawdown(portfolio_value)
             self._update_gross_drawdown(gross_equity)
 
+            # 3. Evaluate the signal on this bar's close, queue it for next bar.
             signal = self._evaluate_strategy(candle, indicators, i)
-
-            if signal == "BUY" and self.holdings == 0 and self.cash > 0:
-                self._execute_buy(candle)
+            if signal == "BUY" and self.holdings == 0:
+                pending_signal = "BUY"
             elif signal == "SELL" and self.holdings > 0:
-                self._execute_sell(candle)
+                pending_signal = "SELL"
 
-        # Force close remaining position
+        # Force close remaining position at the last available close (no next
+        # bar to open into).
         if self.holdings > 0:
-            self._execute_sell(self.visible_market_data[-1], force_close=True)
+            last = self.visible_market_data[-1]
+            self._execute_sell(last["close"], last["date"], exit_reason="force_close")
 
         return self._generate_report()
 
@@ -164,19 +203,6 @@ class SimulationEngine:
                 "bbOffset": bb_period - 1,
             }
 
-        if strategy_type == "ORB":
-            return {
-                "ohlc": self.market_data,
-            }
-
-        if strategy_type == "VWAP_REVERSION":
-            volumes = np.array([c.get("volume", 1) for c in self.market_data], dtype=np.float64)
-            vwap_values = compute_vwap(close_prices, volumes)
-            return {
-                "vwap": vwap_values,
-                "close": close_prices,
-            }
-
         if strategy_type == "DONCHIAN_BREAKOUT":
             high_prices = np.array([c["high"] for c in self.market_data], dtype=np.float64)
             low_prices = np.array([c["low"] for c in self.market_data], dtype=np.float64)
@@ -210,22 +236,33 @@ class SimulationEngine:
         if strategy_type == "BOLLINGER_BREAKOUT":
             return evaluate_bollinger_breakout(indicators, index)
 
-        if strategy_type == "ORB":
-            return evaluate_orb(indicators, index, params.get("orbMinutes", 30))
-
-        if strategy_type == "VWAP_REVERSION":
-            return evaluate_vwap_reversion(indicators, index, params.get("reversionPct", 0.01))
-
         if strategy_type == "DONCHIAN_BREAKOUT":
             return evaluate_donchian_breakout(indicators, index)
 
         raise ValueError(f"Unknown strategy type: {strategy_type}")
 
-    def _execute_buy(self, candle: dict):
-        """Execute a buy order at close price with Indian costs."""
-        price = candle["close"]
+    def _target_shares(self, price: float) -> int:
+        """
+        Number of shares to buy at `price`.
+
+        Risk model (risk_pct + stop_loss_pct set): size the position so that
+        hitting the stop loses exactly `risk_pct` of equity —
+            position_value = (risk_pct * equity) / stop_loss_pct
+        Legacy (unset): deploy all available cash. Both are capped at what the
+        cash on hand can afford, including a transaction-cost buffer.
+        """
         approx_cost_rate = 0.003
-        max_shares = int(self.cash // (price * (1 + approx_cost_rate)))
+        affordable = int(self.cash // (price * (1 + approx_cost_rate)))
+        if not self.risk_managed:
+            return affordable
+        # Flat at entry, so equity == cash.
+        position_value = (self.risk_pct * self.cash) / self.stop_loss_pct
+        target = int(position_value // price)
+        return max(0, min(target, affordable))
+
+    def _execute_buy(self, price: float, date):
+        """Execute a buy order at the given fill price with Indian costs."""
+        max_shares = self._target_shares(price)
         if max_shares == 0:
             return
 
@@ -244,14 +281,20 @@ class SimulationEngine:
         self.cash -= total_cost
         self.holdings = max_shares
         self.entry_price = price
-        self.entry_date = candle["date"]
+        self.entry_date = date
+        # Arm the stop for this position (risk model only).
+        self.stop_price = price * (1 - self.stop_loss_pct) if self.risk_managed else None
 
-    def _execute_sell(self, candle: dict, force_close: bool = False):
-        """Execute a sell order at close price with Indian costs."""
+    def _execute_sell(self, price: float, date, exit_reason: str = "signal"):
+        """
+        Execute a sell order at the given fill price with Indian costs.
+
+        exit_reason: "signal" (strategy SELL), "stop" (stop-loss hit), or
+        "force_close" (open position closed at end of data).
+        """
         if self.holdings == 0:
             return
 
-        price = candle["close"]
         proceeds = self.holdings * price
 
         costs = calculate_indian_costs(proceeds, "SELL", self.rng)
@@ -266,13 +309,13 @@ class SimulationEngine:
         profit_loss = (price - self.entry_price) * self.holdings - total_fee
         gross_profit_loss = (price - self.entry_price) * self.holdings
         pnl_pct = ((price - self.entry_price) / self.entry_price) * 100
-        holding_period = self._days_between(self.entry_date, candle["date"])
+        holding_period = self._days_between(self.entry_date, date)
 
         self.trades.append({
             "type": "LONG",
             "entryDate": self.entry_date,
             "entryPrice": self.entry_price,
-            "exitDate": candle["date"],
+            "exitDate": date,
             "exitPrice": price,
             "shares": self.holdings,
             "profitLoss": profit_loss,
@@ -282,13 +325,15 @@ class SimulationEngine:
             "fee": total_fee,
             "isWin": profit_loss > 0,
             "isGrossWin": gross_profit_loss > 0,
-            "forceClose": force_close,
+            "forceClose": exit_reason == "force_close",
+            "exitReason": exit_reason,
         })
 
         self.cash += net_proceeds
         self.holdings = 0
         self.entry_price = None
         self.entry_date = None
+        self.stop_price = None
 
     def _portfolio_value(self, candle: dict) -> float:
         return self.cash + self.holdings * candle["close"]
@@ -342,6 +387,13 @@ class SimulationEngine:
 
         avg_pnl = (sum(t["profitLoss"] for t in self.trades) / num_trades) if num_trades > 0 else 0
         avg_holding = (sum(t["holdingPeriod"] for t in self.trades) / num_trades) if num_trades > 0 else 0
+
+        # Time-in-market: % of bars actually holding a position. Makes the
+        # Sharpe figure honest — a "Sharpe 1.8 at 22% exposure" strategy is
+        # sitting in cash most of the time, which the cash-inclusive Sharpe
+        # would otherwise hide.
+        exposure_bars = sum(1 for p in self.equity_curve if p["holdings"] > 0)
+        exposure_pct = (exposure_bars / len(self.equity_curve) * 100) if self.equity_curve else 0.0
 
         initial_price = self.visible_market_data[0]["close"]
         final_price = self.visible_market_data[-1]["close"]
@@ -400,6 +452,7 @@ class SimulationEngine:
                 "winRate": win_rate,
                 "avgProfitLoss": avg_pnl,
                 "avgHoldingPeriod": avg_holding,
+                "exposurePct": exposure_pct,
                 "startDate": _date_str(self.visible_market_data[0]["date"]),
                 "endDate": _date_str(self.visible_market_data[-1]["date"]),
                 "totalDays": n,

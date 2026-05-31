@@ -132,62 +132,6 @@ def evaluate_bollinger_breakout(indicators: dict, index: int) -> str:
     return "HOLD"
 
 
-def evaluate_orb(indicators: dict, index: int, orb_minutes: int = 30) -> str:
-    """
-    Opening Range Breakout (ORB) Strategy.
-    For daily data, approximates by checking if current candle breaks
-    above/below the first candle's high/low.
-    
-    Returns BUY if price > first candle high, SELL if < first candle low.
-    """
-    ohlc = indicators["ohlc"]
-    if not ohlc or len(ohlc) < 2:
-        return "HOLD"
-
-    # For daily strategy: first candle sets opening range
-    first_candle = ohlc[0]
-    current_candle = ohlc[index] if index < len(ohlc) else None
-
-    if not current_candle:
-        return "HOLD"
-
-    # ORB breakout logic
-    if current_candle["high"] > first_candle["high"]:
-        return "BUY"
-    if current_candle["low"] < first_candle["low"]:
-        return "SELL"
-
-    return "HOLD"
-
-
-def evaluate_vwap_reversion(indicators: dict, index: int, reversion_pct: float = 0.01) -> str:
-    """
-    VWAP Mean Reversion Strategy.
-    Buy when price is 1% below VWAP, sell when 1% above VWAP.
-    """
-    vwap = indicators["vwap"]
-    close = indicators["close"]
-
-    if index < 0 or index >= len(vwap) or index >= len(close):
-        return "HOLD"
-
-    current_price = close[index]
-    current_vwap = vwap[index]
-
-    if current_vwap is None or current_price is None:
-        return "HOLD"
-
-    # Buy: price significantly below VWAP
-    if current_price < current_vwap * (1.0 - reversion_pct):
-        return "BUY"
-
-    # Sell: price significantly above VWAP
-    if current_price > current_vwap * (1.0 + reversion_pct):
-        return "SELL"
-
-    return "HOLD"
-
-
 def evaluate_donchian_breakout(indicators: dict, index: int) -> str:
     """
     Donchian Channel Breakout Strategy.

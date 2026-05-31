@@ -25,8 +25,12 @@ from pipeline.quality import run_quality_checks
 logger = logging.getLogger("traderetro.eod")
 
 DEFAULT_TICKERS = [
+    # Equities (also the live WebSocket subscription set)
     "RELIANCE.NS", "SBIN.NS", "ICICIBANK.NS", "HDFCBANK.NS", "TCS.NS",
     "ITC.NS", "BHARTIARTL.NS", "BAJFINANCE.NS", "HCLTECH.NS", "INFY.NS",
+    # Indices + macro — the Cross-Asset Monitor reads these, so the daily EOD
+    # run must keep them fresh too (yfinance symbols via YAHOO_INDEX_MAP below).
+    "NIFTY50.NS", "BANKNIFTY.NS", "USDINR", "CRUDE", "INDIAVIX",
 ]
 
 YAHOO_INDEX_MAP = {

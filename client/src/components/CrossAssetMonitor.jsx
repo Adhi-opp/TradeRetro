@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, ReferenceLine, Legend, Cell,
+  ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts';
 
 const LIVE_API = 'http://localhost:8000/api/live';
@@ -603,7 +603,46 @@ function RollingCorrPanel({ refreshSignal }) {
   );
 }
 
-// ─── Lead-Lag proxy (bar chart) ───────────────────────────────────
+// ─── Lead-Lag proxy (lag-profile heatmap) ─────────────────────────
+// Green/red intensity by correlation — same scheme as the correlation matrix.
+function llHeat(x) {
+  if (x == null || Number.isNaN(x)) return 'rgba(107,120,117,0.08)';
+  const a = Math.max(-1, Math.min(1, x));
+  const intensity = 0.12 + Math.abs(a) * 0.65;
+  return a >= 0 ? `rgba(0, 201, 167, ${intensity})` : `rgba(224, 82, 82, ${intensity})`;
+}
+
+function LagRow({ r, lags }) {
+  const byLag = {};
+  (r.lag_profile || []).forEach((p) => { byLag[p.lag] = p.corr; });
+  const meta = tickerMeta(r.peer);
+  return (
+    <>
+      <div className="ca-corr-rowlabel" title={r.peer}>{meta.label}</div>
+      {lags.map((l) => {
+        const v = byLag[l];
+        const isBest = l === r.best_lag_bars;
+        return (
+          <div
+            key={`${r.peer}-${l}`}
+            className="ca-corr-cell"
+            style={{
+              background: llHeat(v),
+              color: Math.abs(v ?? 0) > 0.45 ? '#fff' : 'var(--text-primary)',
+              outline: isBest ? '2px solid var(--primary)' : 'none',
+              outlineOffset: '-2px',
+              fontWeight: isBest ? 700 : 400,
+            }}
+            title={`${meta.label} @ lag ${l}: ${v == null ? '—' : v.toFixed(3)}${isBest ? ' (best)' : ''}`}
+          >
+            {v == null ? '·' : v.toFixed(2)}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function LeadLagPanel({ refreshSignal }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -623,47 +662,37 @@ function LeadLagPanel({ refreshSignal }) {
 
   useEffect(() => { fetchLL(); }, [fetchLL, refreshSignal]);
 
-  const rows = (data?.results || []).map((r) => ({
-    peer: tickerMeta(r.peer).label,
-    lag: r.best_lag_bars,
-    corr: r.corr_at_best,
-    direction: r.direction,
-    accent: tickerMeta(r.peer).accent,
-  }));
+  const results = data?.results || [];
+  const lags = results[0]?.lag_profile?.map((p) => p.lag) || [];
 
   return (
     <Panel
       title="Lead-Lag Profile vs NIFTY 50"
-      subtitle="Best-lag Pearson · positive ⇒ peer leads base"
-      badge={rows.length ? `±5 bars` : null}
+      subtitle="Pearson corr across ±5 daily lags · outlined = best lag · positive lag ⇒ peer leads NIFTY"
+      badge={results.length ? `±${data.max_lag} bars` : null}
     >
       {loading && <div className="ca-empty"><Loader size={14} className="spin-icon" /> Loading…</div>}
       {!loading && data?.status !== 'ok' && (
         <div className="ca-empty ca-empty-warn"><AlertCircle size={14} /> {data?.reason || 'Insufficient data'}</div>
       )}
-      {!loading && data?.status === 'ok' && rows.length > 0 && (
+      {!loading && data?.status === 'ok' && results.length > 0 && (
         <>
-          <div style={{ width: '100%', height: 200 }}>
-            <ResponsiveContainer>
-              <BarChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 4 }} layout="vertical">
-                <CartesianGrid stroke="var(--border-soft)" strokeDasharray="2 4" horizontal={false} />
-                <XAxis type="number" domain={[-5, 5]} ticks={[-5, -2, 0, 2, 5]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="peer" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} width={90} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-                  formatter={(v, k, p) => [`lag=${v} · corr=${p?.payload?.corr?.toFixed(3)}`, p?.payload?.direction]}
-                />
-                <ReferenceLine x={0} stroke="var(--border)" />
-                <Bar dataKey="lag" isAnimationActive={false}>
-                  {rows.map((r, i) => (
-                    <Cell key={i} fill={r.accent} fillOpacity={0.85} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="ca-corr-scroll">
+            <div
+              className="ll-heat"
+              style={{ display: 'grid', gridTemplateColumns: `96px repeat(${lags.length}, minmax(28px, 1fr))`, gap: 2 }}
+            >
+              <div className="ca-corr-corner">lag →</div>
+              {lags.map((l) => (
+                <div key={`h-${l}`} className="ca-corr-header">{l > 0 ? `+${l}` : l}</div>
+              ))}
+              {results.map((r) => (
+                <LagRow key={r.peer} r={r} lags={lags} />
+              ))}
+            </div>
           </div>
           <div className="ll-disclaimer">
-            <Radio size={11} /> Lagged-correlation proxy · not true Granger causality
+            <Radio size={11} /> On daily bars large-caps mostly sync at lag 0 — lead-lag is really an intraday effect. Proxy only, not Granger causality.
           </div>
         </>
       )}

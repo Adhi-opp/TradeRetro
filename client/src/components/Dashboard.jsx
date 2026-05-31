@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database } from 'lucide-react';
-import LeftPane from './LeftPane';
+import ControlBar from './ControlBar';
+import StrategyConfig from './StrategyConfig';
+import TearsheetGrid from './TearsheetGrid';
 import PipelineDashboard from './PipelineDashboard';
-import RightPane from './RightPane';
 import CrossAssetMonitor from './CrossAssetMonitor';
 import DataQualityDashboard from './DataQualityDashboard';
-
-const TIMEOUT_MS = 30000;
-
-function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
-}
+import useBacktestStore from '../store/useBacktestStore';
 
 function MarketClock() {
   const [now, setNow] = useState(() => new Date());
@@ -84,109 +78,9 @@ function AdminMenu({ mode, onSelect }) {
 
 export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   const [mode, setMode] = useState('manual');
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [applyCosts, setApplyCosts] = useState(false);
-  const [backtestTicker, setBacktestTicker] = useState(null);
-  const [strategyParams, setStrategyParams] = useState(null);
-  const [backtestRange, setBacktestRange] = useState(null);
-
-  const getErrorMessage = (data, fallback) => {
-    if (!data) return fallback;
-    if (typeof data === 'string') return data;
-    if (data.message) return data.message;
-    if (data.error && typeof data.error === 'string') return data.error;
-    if (typeof data.detail === 'string') return data.detail;
-    if (data.detail?.message) return data.detail.message;
-    return fallback;
-  };
-
-  const buildParams = (formParams) => {
-    const capital = formParams.initialCapital || 100000;
-    const paramsByStrategy = {
-      MOVING_AVERAGE_CROSSOVER: {
-        shortPeriod: formParams.fastSma,
-        longPeriod: formParams.slowSma,
-        initialCapital: capital,
-      },
-      RSI: {
-        rsiPeriod: formParams.rsiPeriod,
-        oversold: formParams.oversold,
-        overbought: formParams.overbought,
-        initialCapital: capital,
-      },
-      MACD: { initialCapital: capital },
-      BOLLINGER_BREAKOUT: {
-        bbPeriod: formParams.bbPeriod,
-        bbStdDev: formParams.bbStdDev,
-        initialCapital: capital,
-      },
-      ORB: {
-        orbMinutes: 30,
-        initialCapital: capital,
-      },
-      VWAP_REVERSION: {
-        reversionPct: formParams.reversionPct,
-        initialCapital: capital,
-      },
-      DONCHIAN_BREAKOUT: {
-        dcPeriod: formParams.dcPeriod,
-        initialCapital: capital,
-      },
-    };
-    return paramsByStrategy[formParams.strategyType];
-  };
-
-  const handleRunBacktest = async (formParams) => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    const payload = {
-      symbol: formParams.ticker,
-      strategyType: formParams.strategyType,
-      params: buildParams(formParams),
-      startDate: formParams.startDate,
-      endDate: formParams.endDate,
-    };
-    try {
-      const response = await fetchWithTimeout('http://localhost:8000/api/backtest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }, TIMEOUT_MS);
-      const data = await response.json();
-      if (!response.ok) throw new Error(getErrorMessage(data, 'Backend rejected request'));
-      setResult(data);
-      setBacktestTicker(formParams.ticker.toUpperCase());
-      setBacktestRange({ startDate: formParams.startDate, endDate: formParams.endDate });
-      setStrategyParams({
-        strategyType: formParams.strategyType,
-        fastSma: formParams.fastSma,
-        slowSma: formParams.slowSma,
-        rsiPeriod: formParams.rsiPeriod,
-        oversold: formParams.oversold,
-        overbought: formParams.overbought,
-        bbPeriod: formParams.bbPeriod,
-        bbStdDev: formParams.bbStdDev,
-        dcPeriod: formParams.dcPeriod,
-        reversionPct: formParams.reversionPct,
-      });
-    } catch (err) {
-      if (err.name === 'AbortError') setError('Request timed out — server took too long to respond');
-      else setError(err.message || 'Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const switchMode = (newMode) => {
-    setMode(newMode);
-    setError(null);
-  };
+  const loading = useBacktestStore((s) => s.loading);
 
   const isManual = mode === 'manual';
-  const showLeftPane = isManual;
 
   return (
     <div className="ide-shell">
@@ -199,7 +93,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           <nav className="topbar-nav">
             <button
               className={`topbar-tab ${mode === 'manual' ? 'active' : ''}`}
-              onClick={() => switchMode('manual')}
+              onClick={() => setMode('manual')}
               disabled={loading}
             >
               <BarChart3 size={14} />
@@ -207,7 +101,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
             </button>
             <button
               className={`topbar-tab ${mode === 'correlation' ? 'active' : ''}`}
-              onClick={() => switchMode('correlation')}
+              onClick={() => setMode('correlation')}
               disabled={loading}
             >
               <Grid3x3 size={14} />
@@ -218,53 +112,30 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
 
         <div className="ide-header-actions">
           <MarketClock />
-          {isManual && (
-            <label className="cost-toggle" title="Apply Indian taxes (STT, brokerage, slippage)">
-              <input
-                type="checkbox"
-                checked={applyCosts}
-                onChange={(e) => setApplyCosts(e.target.checked)}
-              />
-              <span className="cost-toggle-slider" />
-              <span className="cost-toggle-label">{applyCosts ? 'Taxes ON' : 'Gross'}</span>
-            </label>
-          )}
-          <AdminMenu mode={mode} onSelect={switchMode} />
+          <AdminMenu mode={mode} onSelect={setMode} />
           <button className="theme-toggle" onClick={onToggleTheme} title="Toggle theme">
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
       </header>
 
-      <div className={`ide-body ${showLeftPane ? '' : 'ide-body-full'}`}>
-        {showLeftPane && (
-          <LeftPane
-            mode={mode}
-            onRunBacktest={handleRunBacktest}
-            loading={loading}
-            error={error}
-          />
-        )}
-        {mode === 'pipeline' ? (
-          <PipelineDashboard />
-        ) : mode === 'correlation' ? (
-          <CrossAssetMonitor />
-        ) : mode === 'data-quality' ? (
-          <DataQualityDashboard />
-        ) : (
-          <RightPane
-            mode={mode}
-            result={result}
-            loading={loading}
-            error={error}
-            applyCosts={applyCosts}
-            theme={theme}
-            backtestTicker={backtestTicker}
-            strategyParams={strategyParams}
-            backtestRange={backtestRange}
-          />
-        )}
-      </div>
+      {isManual ? (
+        <div className="backtest-shell">
+          <div className="backtest-controls">
+            <ControlBar />
+            <StrategyConfig />
+          </div>
+          <div className="backtest-body">
+            <TearsheetGrid theme={theme} />
+          </div>
+        </div>
+      ) : (
+        <div className="ide-body ide-body-full">
+          {mode === 'pipeline' && <PipelineDashboard />}
+          {mode === 'correlation' && <CrossAssetMonitor />}
+          {mode === 'data-quality' && <DataQualityDashboard />}
+        </div>
+      )}
     </div>
   );
 }

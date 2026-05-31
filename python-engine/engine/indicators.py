@@ -115,40 +115,29 @@ def compute_bollinger_bands(close_prices: np.ndarray, period: int = 20, std_dev:
     return results
 
 
-def compute_vwap(prices: np.ndarray, volumes: np.ndarray) -> np.ndarray:
-    """
-    Volume-Weighted Average Price (cumulative).
-
-    VWAP = Σ(price * volume) / Σ(volume)
-    
-    Returns array of same length as prices.
-    """
-    if len(prices) != len(volumes):
-        raise ValueError("prices and volumes must have same length")
-
-    cumulative_pv = np.cumsum(prices * volumes)
-    cumulative_vol = np.cumsum(volumes)
-    
-    # Avoid division by zero
-    vwap = np.where(cumulative_vol > 0, cumulative_pv / cumulative_vol, prices)
-    return vwap
-
-
 def compute_donchian_channel(high_prices: np.ndarray, low_prices: np.ndarray, period: int = 20) -> list[dict]:
     """
-    Donchian Channel: highest high and lowest low over N periods.
+    Donchian Channel: highest high / lowest low of the PRIOR N bars.
 
-    Returns list of dicts with keys: highest_high, lowest_low, mid.
-    Length = len(high_prices) - period + 1.
+    The channel is shifted by 1 so the current bar is NOT part of its own
+    channel — otherwise a close can never exceed a high that already
+    includes today's high (close <= high <= highest_high), and the breakout
+    never fires. With shift(1), `close[i] > highest_high[i]` correctly means
+    "today closed above the previous N-day high."
+
+    Returns a FULL-LENGTH list (len == len(high_prices)) aligned to the
+    candle index, so callers can index it directly by bar number. The first
+    `period` entries are None (insufficient prior history).
     """
     high_series = pd.Series(high_prices)
     low_series = pd.Series(low_prices)
 
-    highest = high_series.rolling(window=period).max()
-    lowest = low_series.rolling(window=period).min()
+    # shift(1) → exclude the current bar from its own channel.
+    highest = high_series.shift(1).rolling(window=period).max()
+    lowest = low_series.shift(1).rolling(window=period).min()
 
     results = []
-    for i in range(period - 1, len(high_prices)):
+    for i in range(len(high_prices)):
         hh = float(highest.iloc[i]) if not pd.isna(highest.iloc[i]) else None
         ll = float(lowest.iloc[i]) if not pd.isna(lowest.iloc[i]) else None
         mid = (hh + ll) / 2.0 if (hh is not None and ll is not None) else None

@@ -61,7 +61,6 @@ const OVERLAY_LABELS = {
   donchian_high: 'Donchian High',
   donchian_low: 'Donchian Low',
   donchian_mid: 'Donchian Mid',
-  vwap: 'VWAP',
 };
 
 const MAX_MARKERS = 500;
@@ -165,7 +164,7 @@ export default function ChartWidget({
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const markersRef = useRef(null);
-  const overlaySeriesRef = useRef([]);    // SMA / BB / Donchian / VWAP
+  const overlaySeriesRef = useRef([]);    // SMA / BB / Donchian
   const subplotSeriesRef = useRef([]);    // RSI / MACD lines + histogram
   const equitySeriesRef = useRef([]);     // strategy equity + B&H benchmark
 
@@ -276,7 +275,7 @@ export default function ChartWidget({
     }
   }, [backtestTicker, trades, theme]);
 
-  // ── Overlay rendering (SMA / Bollinger / Donchian / VWAP) ───
+  // ── Overlay rendering (SMA / Bollinger / Donchian) ───
   // Fallback color palette for arbitrary SMA periods (sma_10, sma_30, etc.)
   // — picked from a hash of the period so each ticker/period gets a stable hue.
   const dynamicOverlayColor = (key) => {

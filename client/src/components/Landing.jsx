@@ -26,8 +26,8 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
           <div className="landing-feature">
             <BarChart3 size={20} />
             <div>
-              <div className="landing-feature-title">3 Verified Strategies</div>
-              <div className="landing-feature-desc">MA crossover, RSI, and MACD</div>
+              <div className="landing-feature-title">5 Verified Strategies</div>
+              <div className="landing-feature-desc">MA crossover, RSI, MACD, Bollinger, Donchian</div>
             </div>
           </div>
           <div className="landing-feature">
@@ -65,7 +65,7 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
           <span>Prefect</span>
         </div>
 
-        <div className="landing-version">v0.3 - FastAPI + TimescaleDB</div>
+        <div className="landing-version">v0.4 - FastAPI + TimescaleDB</div>
       </div>
     </div>
   );

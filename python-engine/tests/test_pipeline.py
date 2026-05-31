@@ -114,8 +114,8 @@ class TestFlowStructure:
             DEFAULT_TICKERS,
             INSTRUMENT_KEYS,
         )
-        assert len(DEFAULT_TICKERS) == 10
-        assert len(INSTRUMENT_KEYS) == 10
+        assert len(DEFAULT_TICKERS) == 15   # 10 equities + 2 indices + 3 macro
+        assert len(INSTRUMENT_KEYS) == 10   # live tick subscription = equities only
 
     def test_historical_backfill_importable(self):
         from flows.historical_backfill import (
@@ -126,10 +126,11 @@ class TestFlowStructure:
     def test_quality_audit_importable(self):
         from flows.quality_check import quality_audit
 
-    def test_default_tickers_are_nse(self):
-        from flows.eod_pipeline import DEFAULT_TICKERS
+    def test_default_tickers_are_nse_or_macro(self):
+        from flows.eod_pipeline import DEFAULT_TICKERS, MACRO_TICKERS
         for ticker in DEFAULT_TICKERS:
-            assert ticker.endswith(".NS"), f"{ticker} should be an NSE ticker (.NS suffix)"
+            assert ticker.endswith(".NS") or ticker in MACRO_TICKERS, \
+                f"{ticker} should be an NSE ticker (.NS) or a known macro key"
 
     def test_instrument_keys_format(self):
         from flows.eod_pipeline import INSTRUMENT_KEYS

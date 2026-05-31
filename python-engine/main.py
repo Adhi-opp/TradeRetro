@@ -18,6 +18,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -99,9 +100,12 @@ async def http_exception_handler(request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def request_validation_exception_handler(request, exc: RequestValidationError):
+    # jsonable_encoder is required: a ValueError raised inside a Pydantic v2
+    # model_validator lands in the error's `ctx` as a raw exception object,
+    # which json.dumps cannot serialize (would 500 the validation response).
     return JSONResponse(
         status_code=400,
-        content=_error_body("VALIDATION_ERROR", "Invalid request payload", exc.errors()),
+        content=_error_body("VALIDATION_ERROR", "Invalid request payload", jsonable_encoder(exc.errors())),
     )
 
 

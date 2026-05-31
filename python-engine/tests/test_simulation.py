@@ -50,6 +50,32 @@ def _crossover_market():
     return candles
 
 
+def _crash_market():
+    """
+    A V then a crash, sized for a 5/20 SMA crossover:
+      - decline 100→90 (sets short SMA below long SMA)
+      - sharp rise 90→140 (short crosses UP through long → real golden cross → BUY)
+      - violent -12%/bar crash (blows a 5% stop within a bar, before the
+        faster SMA can produce a death cross → exit is a stop, not a signal)
+      - mild tail
+    """
+    prices = [100 - i * (10 / 25) for i in range(25)]      # decline 100 → 90
+    last = prices[-1]
+    prices += [last + i * (50 / 25) for i in range(25)]    # rise 90 → ~140
+    p = prices[-1]
+    for _ in range(10):                                     # crash -12%/bar
+        p *= 0.88
+        prices.append(p)
+    for _ in range(15):                                     # tail
+        p *= 1.005
+        prices.append(p)
+    candles = []
+    for i, price in enumerate(prices):
+        day = f"2023-{1 + i // 28:02d}-{1 + i % 28:02d}"
+        candles.append(_make_candle(day, round(price, 2)))
+    return candles
+
+
 # ── Report Structure Tests ───────────────────────────────────────────────────
 
 class TestReportStructure:
@@ -210,3 +236,70 @@ class TestEdgeCases:
         assert len(result1["trades"]) == len(result2["trades"])
         for t1, t2 in zip(result1["trades"], result2["trades"]):
             assert t1["profitLoss"] == t2["profitLoss"]
+
+
+# ── Risk Model: position sizing + stop-loss ──────────────────────────────────
+
+class TestRiskModel:
+    """Fixed-fractional position sizing and stop-loss exits."""
+
+    _MA_CONFIG = {
+        "strategyType": "MOVING_AVERAGE_CROSSOVER",
+        "params": {"shortPeriod": 20, "longPeriod": 50, "initialCapital": 100_000},
+    }
+
+    def _risk_config(self, risk_pct=0.02, stop_pct=0.05):
+        return {
+            "strategyType": "MOVING_AVERAGE_CROSSOVER",
+            "params": {
+                "shortPeriod": 20, "longPeriod": 50, "initialCapital": 100_000,
+                "riskPct": risk_pct, "stopLossPct": stop_pct,
+            },
+        }
+
+    def test_target_shares_sizes_to_risk(self):
+        """position_value = (risk * equity) / stop → fewer shares than all-in."""
+        data = _rising_market(300)
+        risk_eng = SimulationEngine(data, 100_000, self._risk_config())
+        legacy_eng = SimulationEngine(data, 100_000, self._MA_CONFIG)
+
+        # risk 2% / stop 5% → deploy ~40% of equity → 40_000 / 100 = 400 shares
+        assert risk_eng._target_shares(100.0) == 400
+        # legacy deploys (almost) all cash → far more shares
+        assert legacy_eng._target_shares(100.0) > risk_eng._target_shares(100.0)
+
+    def test_risk_managed_run_does_not_go_all_in(self):
+        """First entry deploys a fraction of capital, not the whole book."""
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self._risk_config()).run()
+        assert result["trades"], "expected at least one trade"
+        first = result["trades"][0]
+        deployed = first["shares"] * first["entryPrice"]
+        # 2% risk / 5% stop ⇒ ~40% deployed; comfortably under all-in.
+        assert deployed < 0.6 * 100_000
+
+    def test_stop_loss_fires_on_crash(self):
+        """A violent drop after entry should trigger a stop exit, not a signal."""
+        data = _crash_market()  # V-shape then craters -12%/bar
+        config = {
+            "strategyType": "MOVING_AVERAGE_CROSSOVER",
+            "params": {
+                "shortPeriod": 5, "longPeriod": 20, "initialCapital": 100_000,
+                "riskPct": 0.02, "stopLossPct": 0.05,
+            },
+        }
+        result = SimulationEngine(data, 100_000, config).run()
+        reasons = [t["exitReason"] for t in result["trades"]]
+        assert "stop" in reasons
+
+    def test_every_trade_has_exit_reason(self):
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self._risk_config()).run()
+        for t in result["trades"]:
+            assert t["exitReason"] in ("signal", "stop", "force_close")
+
+    def test_legacy_run_has_no_stop_exits(self):
+        """Without risk params, no stop should ever fire."""
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self._MA_CONFIG).run()
+        assert all(t["exitReason"] != "stop" for t in result["trades"])

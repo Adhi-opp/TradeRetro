@@ -21,7 +21,6 @@ from engine.indicators import (
     compute_macd,
     compute_rsi,
     compute_sma,
-    compute_vwap,
 )
 from services.db import get_pool
 from services.ticker_resolver import normalize
@@ -59,7 +58,6 @@ def _attach_indicators(
     closes = np.array([row["close"] for row in data], dtype=float)
     highs = np.array([row["high"] for row in data], dtype=float)
     lows = np.array([row["low"] for row in data], dtype=float)
-    volumes = np.array([row["volume"] for row in data], dtype=float)
     n = len(data)
     attached: list[str] = []
 
@@ -112,23 +110,15 @@ def _attach_indicators(
 
     elif strategy_type == "DONCHIAN_BREAKOUT":
         period = dc_period or 20
-        if n >= period:
+        if n > period:
+            # compute_donchian_channel returns a full-length array (one entry
+            # per bar, None during warm-up), so index it directly by bar.
             dc_results = compute_donchian_channel(highs, lows, period)
-            offset = period - 1
             for i, result in enumerate(dc_results):
-                if offset + i < n:
-                    data[offset + i]["donchian_high"] = result["highest_high"]
-                    data[offset + i]["donchian_low"] = result["lowest_low"]
-                    data[offset + i]["donchian_mid"] = result["mid"]
+                data[i]["donchian_high"] = result["highest_high"]
+                data[i]["donchian_low"] = result["lowest_low"]
+                data[i]["donchian_mid"] = result["mid"]
         attached.extend(["donchian_high", "donchian_low", "donchian_mid"])
-
-    elif strategy_type == "VWAP_REVERSION":
-        # Cumulative VWAP. For daily candles this is a rough proxy — better
-        # for intraday data, but still useful as a regime line.
-        vwap_arr = compute_vwap(closes, volumes)
-        for i, val in enumerate(vwap_arr):
-            data[i]["vwap"] = float(val)
-        attached.append("vwap")
 
     return {"attached": attached, "strategy_type": strategy_type}
 
