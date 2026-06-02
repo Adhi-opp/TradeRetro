@@ -115,11 +115,12 @@ Built as a Data Engineering portfolio project demonstrating production-grade str
 | **Idempotent Upserts** | `ON CONFLICT DO NOTHING` (bronze) / `DO UPDATE` (silver) — re-aggregating same bucket is safe |
 | **Watermark-Driven Incremental Ingestion** | `ops.data_catalog.high_watermark` drives EOD incremental loads — polling-based, not log-based CDC |
 | **Data Quality Gates** | Hard checks (OHLCV invariants, nulls) + soft checks (outliers, staleness) + gap detection using NIFTY50 as empirical NSE calendar |
+| **Self-Healing Reconciliation** | Detects missing 1-min silver buckets during market hours (past a grace window so it doesn't race the aggregator), backfills them from the Upstox intraday-candle REST API, and UPSERTs `ON CONFLICT DO NOTHING` so real stream bars are never clobbered. Each row carries a `source` tag (`stream` vs `reconciled`) for lineage. Solves the dropped-tick problem when the WebSocket disconnects mid-session. |
 | **DAG Orchestration** | Prefect flows: EOD pipeline, historical backfill, quality audit |
 | **In-Process Scheduling** | Async scheduler inside FastAPI lifespan — invokes Prefect flows weekdays at 16:00 IST without a separate work pool |
 | **Continuous Aggregates** | TimescaleDB-managed: `gold.ohlcv_5min` refreshed every 5 min, `gold.ohlcv_daily` every hour |
 | **Retention Policies** | Auto-drop bronze chunks > 30 days, pipeline metrics > 90 days |
-| **Schema Migrations** | 10 version-controlled SQL files (000–009) applied at first DB boot |
+| **Schema Migrations** | 11 version-controlled SQL files (000–010) applied at first DB boot |
 | **Live Quote Resolution** | `/api/live/quotes` prefers Redis ticks < 60s old, falls back to EOD with stale-days flag — frontend gets unified data with source labels |
 | **Observability** | 4 Grafana dashboards + `/api/health/pipeline` endpoint surfacing live tick rate, layer counts, freshness |
 | **Connection Pooling** | Shared asyncpg pool via FastAPI lifespan (not per-request) |
@@ -167,11 +168,12 @@ ops.pipeline_metrics         -- Time-series telemetry for Grafana (hypertable, 9
 ### Migrations (applied on first boot)
 
 ```
-000_create_raw_schema.sql          005_create_silver_schema.sql
-001_create_ops_schema.sql          006_create_gold_views.sql
-002_create_analytics_schema.sql    007_create_pipeline_metrics.sql
-003_enable_timescaledb.sql         008_create_user_universe.sql
-004_create_bronze_schema.sql       009_retention_policies.sql
+000_create_raw_schema.sql          006_create_gold_views.sql
+001_create_ops_schema.sql          007_create_pipeline_metrics.sql
+002_create_analytics_schema.sql    008_create_user_universe.sql
+003_enable_timescaledb.sql         009_retention_policies.sql
+004_create_bronze_schema.sql       010_silver_source_column.sql
+005_create_silver_schema.sql
 ```
 
 ---
@@ -255,10 +257,11 @@ Worker will auto-connect at the next NSE open (9:00 IST, Mon-Fri).
 | `pipeline.simulator.run_simulator` | Dev-mode fallback: bootstraps base prices from EOD warehouse, oscillates within ±0.05% |
 | `pipeline.consumer.consume_loop` | `XREADGROUP` (batch 200) → batch INSERT into `bronze.market_ticks` → XACK |
 | `pipeline.silver_aggregator.run_aggregator_loop` | Every 60s: re-aggregate last 5 min of bronze ticks into `silver.ohlcv_1min` (idempotent UPSERT) |
+| `pipeline.reconciliation.run_reconciler_loop` | **(live only)** Every 3 min during market hours: detect missing 1-min silver buckets and patch them from the Upstox intraday-candle REST API — self-heals WebSocket drops |
 
 The worker runs in one of three modes via `PIPELINE_MODE`:
 - `simulate` — simulator + consumer + silver aggregator (default, no Upstox needed)
-- `live` — upstox_ws producer + consumer + silver aggregator
+- `live` — upstox_ws producer + consumer + silver aggregator + **reconciler**
 - `consumer_only` — consumer + silver aggregator (producer external)
 
 ### EOD pipeline (`api` container, scheduled async task)
@@ -346,6 +349,12 @@ The same Redis-first logic is used by `/api/live/vix` and (for chart series) `/a
 |--------|----------|-------------|
 | `GET` | `/api/quality/audit?recent=true\|false` | Per-ticker quality audit: hard fails, soft warnings, gaps, staleness — sorted by severity |
 | `GET` | `/api/quality/audit/{ticker}` | Drill-down quality audit for one ticker |
+
+### Reconciliation (self-healing)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/reconcile/gaps` | Dry run — missing 1-min silver buckets per instrument for today's session |
+| `POST` | `/api/reconcile` | Detect gaps and patch them from the Upstox intraday-candle REST API (idempotent, `source='reconciled'`) |
 
 ### Cross-Asset Correlation
 | Method | Endpoint | Description |

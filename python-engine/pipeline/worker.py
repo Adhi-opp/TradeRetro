@@ -58,8 +58,13 @@ async def main() -> None:
 
         elif mode == "live":
             from pipeline.upstox_ws import produce
+            from pipeline.reconciliation import run_reconciler_loop
             tasks.append(asyncio.create_task(produce(), name="ws_producer"))
-            logger.info("Upstox WebSocket producer started")
+            # Self-healing: patch silver gaps the WS dropped (live mode only —
+            # there's no authoritative REST source to reconcile against in
+            # simulate mode).
+            tasks.append(asyncio.create_task(run_reconciler_loop(), name="reconciler"))
+            logger.info("Upstox WebSocket producer + reconciler started")
 
         elif mode == "consumer_only":
             logger.info("Consumer-only mode — no producer")

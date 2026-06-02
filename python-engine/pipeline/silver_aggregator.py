@@ -28,7 +28,7 @@ AGG_WINDOW_MINUTES = 5        # how far back we re-aggregate each run
 # with the latest aggregate.
 AGGREGATE_SQL = """
 INSERT INTO silver.ohlcv_1min
-    (instrument_key, bucket, open, high, low, close, volume, trade_count, quality_score)
+    (instrument_key, bucket, open, high, low, close, volume, trade_count, quality_score, source)
 SELECT
     instrument_key,
     time_bucket('1 minute', timestamp) AS bucket,
@@ -38,7 +38,8 @@ SELECT
     last(ltp, timestamp)               AS close,
     sum(volume)::bigint                AS volume,
     count(*)::int                      AS trade_count,
-    100                                AS quality_score
+    100                                AS quality_score,
+    'stream'                           AS source
 FROM bronze.market_ticks
 WHERE timestamp >= now() - ($1 || ' minutes')::interval
   AND timestamp <  date_trunc('minute', now())  -- only completed buckets
@@ -50,7 +51,9 @@ ON CONFLICT (instrument_key, bucket) DO UPDATE SET
     low         = EXCLUDED.low,
     close       = EXCLUDED.close,
     volume      = EXCLUDED.volume,
-    trade_count = EXCLUDED.trade_count;
+    trade_count = EXCLUDED.trade_count,
+    -- real stream ticks reclaim a bucket that was previously reconciled
+    source      = 'stream';
 """
 
 

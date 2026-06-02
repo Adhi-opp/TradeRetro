@@ -27,7 +27,7 @@ from config import settings
 from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
 from services.scheduler import run_eod_scheduler
-from routers import backtest, signals, health, auth, ingestion, correlation, universe, live, quality
+from routers import backtest, signals, health, auth, ingestion, correlation, universe, live, quality, reconcile
 
 
 @asynccontextmanager
@@ -75,6 +75,7 @@ app.include_router(correlation.router)
 app.include_router(universe.router)
 app.include_router(live.router)
 app.include_router(quality.router)
+app.include_router(reconcile.router)
 
 
 # ── Exception Handlers ────────────────────────────────────────
