@@ -334,6 +334,7 @@ The same Redis-first logic is used by `/api/live/vix` and (for chart series) `/a
 |--------|----------|-------------|
 | `POST` | `/api/backtest` | Vectorized backtest (MA Crossover, RSI, MACD, Bollinger, Donchian) — next-bar-open fills |
 | `POST` | `/api/backtest/sweep` | Parameter sweep — vary 2 params, returns 2D metric grid |
+| `POST` | `/api/backtest/wfa` | Walk-forward analysis — rolling train/test, OOS stitching, efficiency ratio + overfit verdict |
 | `GET` | `/api/signals/unified/{ticker}` | Strategy-aware indicators (RSI, MACD, Bollinger, Donchian, arbitrary SMA periods) attached to a price series — drives the Backtest chart overlays |
 
 ### Live Market Data
@@ -420,6 +421,27 @@ belong in a separate intraday engine, not bolted onto the daily evaluator.)
 Signals are computed on a bar's **close**, but orders fill at the **next bar's
 open** — you can't trade at a close you only learn once the bar is over. This
 removes same-bar look-ahead bias. A signal on the final bar simply never fills.
+
+### Risk Model (optional)
+
+Per-trade **position sizing + stop-loss**. Set `riskPct` + `stopLossPct` and the
+engine sizes each position so a stop-out costs exactly `riskPct` of equity
+(`position = riskPct·equity / stopLossPct`). Stops are resting orders → they fill
+**intrabar** (not look-ahead); a gap-through fills at the open. Each trade records
+an `exitReason` (`signal` / `stop` / `force_close`). With no risk params the engine
+runs all-in (legacy behavior), so the metric is opt-in.
+
+### Walk-Forward Analysis
+
+The parameter sweep optimizes in-sample, which curve-fits. WFA proves (or
+disproves) out-of-sample robustness: for each rolling fold it optimizes candidate
+params on a **train** window, then tests the winner on the next, unseen **test**
+bars; the OOS segments are stitched into one continuous equity curve. The headline
+is the **walk-forward efficiency ratio** (aggregate OOS metric ÷ mean in-sample
+metric) and a verdict (`robust` / `marginal` / `overfit`). Reuses the same engine,
+so OOS runs honor next-bar-open fills, costs, and the risk model. *(Example: MA
+crossover on 10y RELIANCE — in-sample Sharpe 0.6, OOS Sharpe −1.1, efficiency
+−1.9 → **overfit**, exactly as WFA should catch.)*
 
 ### Cost Model
 

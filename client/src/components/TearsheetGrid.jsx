@@ -13,6 +13,7 @@ import RiskMetricsGrid from './RiskMetricsGrid';
 import MonthlyHeatmap from './MonthlyHeatmap';
 import ReturnDistribution from './ReturnDistribution';
 import ParameterSweep from './ParameterSweep';
+import WalkForward from './WalkForward';
 
 function LoadingState() {
   return (
@@ -147,6 +148,10 @@ export default function TearsheetGrid({ theme }) {
               }}
               dateRange={ranRange}
             />
+          </ErrorBoundary>
+
+          <ErrorBoundary fallbackTitle="Walk-Forward Failed" fallbackMessage="Could not render walk-forward analysis.">
+            <WalkForward />
           </ErrorBoundary>
         </div>
       )}

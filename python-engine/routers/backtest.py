@@ -3,6 +3,7 @@ Backtest Router
 ===============
 POST /api/backtest        — run a single strategy backtest
 POST /api/backtest/sweep  — parameter sweep, returns 2D metric grid
+POST /api/backtest/wfa    — walk-forward analysis (out-of-sample robustness)
 """
 
 import asyncio
@@ -13,7 +14,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from engine.simulation import SimulationEngine
-from models.requests import BacktestRequest
+from engine.wfa import run_wfa, strategy_warmup
+from models.requests import STRATEGY_TYPES, BacktestRequest
 from models.responses import BacktestResponse
 from services.data_loader import (
     HistoricalDataWindow,
@@ -314,3 +316,93 @@ async def parameter_sweep(req: SweepRequest):
         "cellCount": len(req.valuesA) * len(req.valuesB),
         "executionTimeMs": round((time.time() - start_time) * 1000, 1),
     }
+
+
+# ── Walk-Forward Analysis ────────────────────────────────────────
+
+class WFARequest(BaseModel):
+    symbol: str
+    strategyType: STRATEGY_TYPES
+    baseParams: dict = Field(..., description="Fixed params; must include initialCapital")
+    candidates: list[dict] = Field(
+        ..., min_length=1, max_length=40,
+        description="Param-override sets; the in-sample winner each fold is tested OOS",
+    )
+    startDate: str
+    endDate: str
+    trainBars: int = Field(252, ge=20, le=2000)   # ~1 trading year
+    testBars: int = Field(63, ge=5, le=1000)      # ~1 quarter
+    metric: Literal["sharpe", "totalReturn", "calmar"] = "sharpe"
+    step: Optional[int] = Field(None, ge=5, le=1000)
+
+
+@router.post("/api/backtest/wfa")
+async def walk_forward(req: WFARequest):
+    """
+    Rolling train/test walk-forward analysis. Optimizes candidate params on each
+    train window, tests the winner out-of-sample on the next bars, stitches the
+    OOS segments, and reports the walk-forward efficiency ratio.
+    """
+    start_time = time.time()
+
+    if "initialCapital" not in req.baseParams:
+        raise HTTPException(
+            status_code=400,
+            detail=_error_body("VALIDATION_ERROR", "baseParams.initialCapital is required"),
+        )
+
+    # Warm-up buffer = the largest indicator lookback across all candidates.
+    warmup = max(strategy_warmup(req.strategyType, {**req.baseParams, **c}) for c in req.candidates)
+
+    try:
+        window = await load_historical_data(
+            ticker=req.symbol,
+            start_date=req.startDate,
+            end_date=req.endDate,
+            warmup_candles=warmup,
+        )
+    except InvalidDateError as exc:
+        raise HTTPException(status_code=400, detail=_error_body("VALIDATION_ERROR", str(exc))) from exc
+    except NoDataError as exc:
+        raise HTTPException(status_code=404, detail=_error_body("NO_DATA", str(exc))) from exc
+    except InsufficientWarmupHistoryError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=_error_body("INSUFFICIENT_WARMUP_HISTORY", str(exc), exc.details()),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=_error_body("POSTGRES_UNAVAILABLE", f"PostgreSQL unavailable: {exc}"),
+        ) from exc
+
+    market_data = _dataframe_to_market_data(window)
+
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(
+            None,
+            run_wfa,
+            market_data, window.visible_start_index, req.strategyType,
+            req.baseParams, req.candidates, req.trainBars, req.testBars,
+            req.metric, req.step,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=_error_body("VALIDATION_ERROR", str(exc))) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=_error_body("WFA_EXECUTION_ERROR", f"WFA execution error: {exc}"),
+        ) from exc
+
+    result["meta"] = {
+        "symbol": req.symbol,
+        "strategyType": req.strategyType,
+        "candidatesTried": len(req.candidates),
+        "trainBars": req.trainBars,
+        "testBars": req.testBars,
+        "warmupBars": warmup,
+        "visibleBars": window.visible_count,
+        "executionTimeMs": round((time.time() - start_time) * 1000, 1),
+    }
+    return result
