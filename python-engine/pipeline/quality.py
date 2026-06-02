@@ -18,6 +18,11 @@ logger = logging.getLogger("traderetro.quality")
 # ── Check definitions ────────────────────────────────────────────
 # Each tuple: (name, SQL template with {f} for recency filter, detail template)
 
+# Commodity/futures can legitimately settle at or below zero — WTI crude
+# closed at -$37.63 on 2020-04-20. For these tickers the close>0 check is a
+# soft warning, not a hard fail; for equities/indices it stays hard.
+NEGATIVE_PRICE_OK = {"CRUDE"}
+
 HARD_CHECKS = [
     ("close_positive",
      "SELECT COUNT(*) FROM raw.historical_prices WHERE ticker = $1 {f} AND close_price <= 0",
@@ -68,12 +73,18 @@ async def run_quality_checks(ticker: str, only_recent: bool = False) -> dict:
             return {"hard_fail": False, "hard_failures": [], "soft_warnings": [], "rows_checked": 0}
 
         hard_failures = []
+        downgraded = []  # hard checks waived to soft for this ticker
         for name, sql, detail_tpl in HARD_CHECKS:
             count = await conn.fetchval(sql.replace("{f}", f), ticker)
             if count > 0:
-                hard_failures.append({"check": name, "detail": detail_tpl.format(n=count), "row_count": count})
+                item = {"check": name, "detail": detail_tpl.format(n=count), "row_count": count}
+                if name == "close_positive" and ticker in NEGATIVE_PRICE_OK:
+                    item["detail"] += " (allowed for futures — e.g. WTI 2020-04-20)"
+                    downgraded.append(item)
+                else:
+                    hard_failures.append(item)
 
-        soft_warnings = []
+        soft_warnings = list(downgraded)
         for name, sql, detail_tpl in SOFT_CHECKS:
             count = await conn.fetchval(sql.replace("{f}", f), ticker)
             if count > 0:
