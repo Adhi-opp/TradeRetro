@@ -7,7 +7,11 @@ group, batch-inserts them into `bronze.market_ticks`, and acknowledges.
 Design choices:
     - Batch insert (executemany) for throughput — not row-at-a-time
     - Consumer group ensures at-least-once delivery
-    - ON CONFLICT DO NOTHING for idempotency on reprocessing
+    - Bronze is append-only (no unique key): dedup/idempotency is enforced
+      downstream at silver, keyed on (instrument_key, bucket). The ON CONFLICT
+      DO NOTHING below is a defensive guard that never fires absent a constraint
+      — at-least-once redelivery can therefore re-insert a tick, which is fine
+      because silver re-aggregation is deterministic and overwrites the bucket.
 """
 
 import asyncio
