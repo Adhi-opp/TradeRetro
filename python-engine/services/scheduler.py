@@ -11,7 +11,7 @@ Prefect scheduler.
 
 import asyncio
 import logging
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("traderetro.scheduler")
@@ -29,6 +29,52 @@ def _next_eod_run(now_ist: datetime) -> datetime:
     while target.weekday() >= 5:
         target += timedelta(days=1)
     return target
+
+
+def _last_expected_eod_date(now_ist: datetime) -> date:
+    """Most recent weekday whose 16:00 IST EOD slot has already passed."""
+    d = now_ist.date()
+    if now_ist.timetz().replace(tzinfo=None) < EOD_TIME_IST:
+        d -= timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+async def _catch_up_if_stale() -> None:
+    """
+    On startup, run EOD immediately if the warehouse missed its last slot.
+
+    The fixed 16:00 IST slot only fires while the container is running —
+    on a machine that isn't always on, the warehouse silently goes stale.
+    The EOD flow is watermark-driven and idempotent, so a catch-up run
+    backfills every missed day in one shot.
+    """
+    from services.db import get_pool
+
+    try:
+        pool = get_pool()
+        watermark = await pool.fetchval(
+            "SELECT MAX(trade_date) FROM raw.historical_prices"
+        )
+    except Exception as exc:
+        logger.warning("Catch-up check skipped (DB not ready): %s", exc)
+        return
+
+    if watermark is None:
+        logger.info("Catch-up check: warehouse empty — leaving backfill to the user")
+        return
+
+    expected = _last_expected_eod_date(datetime.now(IST))
+    if watermark >= expected:
+        logger.info("Catch-up check: warehouse fresh (watermark %s)", watermark)
+        return
+
+    logger.info(
+        "Catch-up: warehouse stale (watermark %s < expected %s) — running EOD now",
+        watermark, expected,
+    )
+    await _run_eod_once()
 
 
 async def _run_eod_once() -> None:
@@ -49,6 +95,12 @@ async def run_eod_scheduler() -> None:
     Survives transient failures by recomputing the next slot.
     """
     logger.info("EOD scheduler started — target: 16:00 IST on weekdays")
+
+    # Give the lifespan a moment to finish pool init, then heal staleness
+    # from any missed slots while the container was down.
+    await asyncio.sleep(15)
+    await _catch_up_if_stale()
+
     while True:
         now = datetime.now(IST)
         next_run = _next_eod_run(now)

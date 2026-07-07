@@ -131,7 +131,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
         </div>
       ) : (
         <div className="ide-body ide-body-full">
-          {mode === 'pipeline' && <PipelineDashboard />}
+          {mode === 'pipeline' && <PipelineDashboard theme={theme} />}
           {mode === 'correlation' && <CrossAssetMonitor />}
           {mode === 'data-quality' && <DataQualityDashboard />}
         </div>

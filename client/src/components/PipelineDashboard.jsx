@@ -1,9 +1,19 @@
-const DEFAULT_GRAFANA_DASHBOARD_URL =
-  'http://localhost:3000/d/pipeline-health/pipeline-health?orgId=1&kiosk=tv';
+const GRAFANA_BASE_URL =
+  import.meta.env.VITE_GRAFANA_PIPELINE_URL ||
+  'http://localhost:3000/d/pipeline-health/pipeline-health';
 
-export default function PipelineDashboard() {
-  const dashboardUrl =
-    import.meta.env.VITE_GRAFANA_PIPELINE_URL || DEFAULT_GRAFANA_DASHBOARD_URL;
+export default function PipelineDashboard({ theme = 'dark' }) {
+  // `kiosk` (no value) hides all Grafana chrome on Grafana 10+;
+  // the old `kiosk=tv` mode was removed. 30-day window so the EOD
+  // pipeline panels (one run/day) actually have data to show.
+  const params = new URLSearchParams({
+    orgId: '1',
+    from: 'now-30d',
+    to: 'now',
+    refresh: '30s',
+    theme,
+  });
+  const dashboardUrl = `${GRAFANA_BASE_URL}?${params.toString()}&kiosk`;
 
   return (
     <div className="right-pane">
