@@ -1,5 +1,7 @@
 # TradeRetro
 
+[![CI](https://github.com/Adhi-opp/TradeRetro/actions/workflows/ci.yml/badge.svg)](https://github.com/Adhi-opp/TradeRetro/actions/workflows/ci.yml)
+
 A high-throughput financial data pipeline and quantitative backtesting platform for NSE equities. Ingests live market data via the Upstox V3 WebSocket, persists to a TimescaleDB Medallion warehouse with continuous bronze→silver→gold aggregation, orchestrates EOD pipelines through Prefect, and serves a React UI for cross-asset research and strategy backtesting.
 
 Built as a Data Engineering portfolio project demonstrating production-grade streaming ETL, time-series warehousing, data-quality enforcement, and observability on real Indian equity market data.
@@ -117,7 +119,7 @@ Built as a Data Engineering portfolio project demonstrating production-grade str
 | **Data Quality Gates** | Hard checks (OHLCV invariants, nulls) + soft checks (outliers, staleness) + gap detection using NIFTY50 as empirical NSE calendar |
 | **Self-Healing Reconciliation** | Detects missing 1-min silver buckets during market hours (past a grace window so it doesn't race the aggregator), backfills them from the Upstox intraday-candle REST API, and UPSERTs `ON CONFLICT DO NOTHING` so real stream bars are never clobbered. Each row carries a `source` tag (`stream` vs `reconciled`) for lineage. Solves the dropped-tick problem when the WebSocket disconnects mid-session. |
 | **DAG Orchestration** | Prefect flows: EOD pipeline, historical backfill, quality audit |
-| **In-Process Scheduling** | Async scheduler inside FastAPI lifespan — invokes Prefect flows weekdays at 16:00 IST without a separate work pool |
+| **In-Process Scheduling** | Async scheduler inside FastAPI lifespan — invokes Prefect flows weekdays at 16:00 IST without a separate work pool. On startup it compares the warehouse watermark against the last expected trading day and runs a catch-up EOD immediately if slots were missed while the host was off — a single-host stack heals its own staleness. |
 | **Continuous Aggregates** | TimescaleDB-managed: `gold.ohlcv_5min` refreshed every 5 min, `gold.ohlcv_daily` every hour |
 | **Retention Policies** | Auto-drop bronze chunks > 30 days, pipeline metrics > 90 days |
 | **Schema Migrations** | 11 version-controlled SQL files (000–010) applied at first DB boot |
@@ -266,7 +268,7 @@ The worker runs in one of three modes via `PIPELINE_MODE`:
 
 ### EOD pipeline (`api` container, scheduled async task)
 
-`services.scheduler.run_eod_scheduler` runs inside the FastAPI lifespan. Computes the next Mon-Fri 16:00 IST slot, sleeps until then, invokes the Prefect-decorated `flows.eod_pipeline.eod_pipeline` flow, then re-computes for the next day. Skip weekends.
+`services.scheduler.run_eod_scheduler` runs inside the FastAPI lifespan. On startup it first checks whether the warehouse watermark is behind the last expected trading day (the fixed 16:00 slot only fires while the container is running, so a laptop-hosted stack misses slots) and runs a catch-up EOD immediately if so — the flow is watermark-driven and idempotent, so one run backfills every missed day. It then computes the next Mon-Fri 16:00 IST slot, sleeps until then, invokes the Prefect-decorated `flows.eod_pipeline.eod_pipeline` flow, and re-computes for the next day. Skips weekends.
 
 Inside the flow per ticker:
 ```
@@ -516,6 +518,7 @@ TradeRetro/
 │   │   ├── quality.py              # /api/quality/audit + /audit/{ticker}
 │   │   ├── correlation.py
 │   │   ├── ingestion.py
+│   │   ├── reconcile.py            # /api/reconcile + /api/reconcile/gaps
 │   │   ├── universe.py
 │   │   ├── auth.py
 │   │   └── health.py               # /api/health + /api/health/pipeline
@@ -526,6 +529,7 @@ TradeRetro/
 │   │   ├── indicators.py
 │   │   ├── costs.py                # Indian equity cost model
 │   │   ├── metrics.py
+│   │   ├── wfa.py                  # Walk-forward analysis engine
 │   │   └── corr_engine.py          # Pure pandas/numpy correlation analytics
 │   │
 │   ├── services/                   # Shared backend logic
@@ -541,6 +545,7 @@ TradeRetro/
 │   │   ├── simulator.py            # Bootstraps base prices from EOD; bounded oscillation
 │   │   ├── consumer.py             # Redis → bronze
 │   │   ├── silver_aggregator.py    # bronze → silver every 60s (Medallion)
+│   │   ├── reconciliation.py       # Self-healing silver gap backfill (live mode)
 │   │   ├── worker.py               # Worker entry point (multi-task asyncio)
 │   │   ├── market_hours.py         # IST trading hours + NSE holiday calendar
 │   │   └── quality.py              # Hard/soft DQ checks + gap detection
@@ -554,7 +559,7 @@ TradeRetro/
 │   │   ├── requests.py
 │   │   └── responses.py
 │   │
-│   ├── migrations/                 # 10 versioned SQL files (000–009)
+│   ├── migrations/                 # 11 versioned SQL files (000–010)
 │   │   ├── 000_create_raw_schema.sql
 │   │   ├── 001_create_ops_schema.sql
 │   │   ├── 002_create_analytics_schema.sql
@@ -564,7 +569,8 @@ TradeRetro/
 │   │   ├── 006_create_gold_views.sql
 │   │   ├── 007_create_pipeline_metrics.sql
 │   │   ├── 008_create_user_universe.sql
-│   │   └── 009_retention_policies.sql
+│   │   ├── 009_retention_policies.sql
+│   │   └── 010_silver_source_column.sql
 │   │
 │   ├── proto/                      # Upstox protobuf definition
 │   │   └── MarketDataFeed.proto
@@ -574,7 +580,9 @@ TradeRetro/
 │       ├── test_costs.py
 │       ├── test_metrics.py
 │       ├── test_pipeline.py
+│       ├── test_reconciliation.py
 │       ├── test_routers.py
+│       ├── test_wfa.py
 │       └── test_correlation.py
 │
 ├── client/                         # React frontend (Vite)
@@ -711,7 +719,9 @@ python -m pytest tests/ -v
 | `test_costs.py` | Indian cost model: STT, stamp duty, GST, brokerage, slippage |
 | `test_metrics.py` | Sharpe, max drawdown, CAGR, alpha, information ratio |
 | `test_pipeline.py` | Market hours, quality checks, flow imports |
+| `test_reconciliation.py` | Gap detection + self-healing backfill logic |
 | `test_routers.py` | FastAPI endpoint smoke tests |
+| `test_wfa.py` | Walk-forward analysis: folds, OOS stitching, efficiency verdicts |
 | `test_correlation.py` | Correlation engine: matrix, rolling, lead-lag, divergence |
 
 Tests stub Redis / asyncpg / Prefect via `sys.modules` so they run without Docker.
