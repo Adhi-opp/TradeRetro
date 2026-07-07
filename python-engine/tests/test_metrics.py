@@ -10,8 +10,6 @@ import numpy as np
 import pytest
 
 from engine.metrics import (
-    RISK_FREE_RATE,
-    TRADING_DAYS,
     alpha,
     benchmark_cagr,
     cagr,
@@ -153,7 +151,6 @@ class TestInformationRatio:
     def test_identical_curves_returns_zero(self):
         """Strategy = benchmark → excess return = 0 → IR = 0."""
         equity = np.linspace(100_000, 120_000, 100)
-        prices = equity / 1000  # Same shape, different scale
         ir = information_ratio(equity, equity)
         assert ir == 0.0
 

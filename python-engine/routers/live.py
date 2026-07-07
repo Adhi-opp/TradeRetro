@@ -12,7 +12,7 @@ is flowing - at which point the quote endpoint will prefer Redis.
 """
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Query
 

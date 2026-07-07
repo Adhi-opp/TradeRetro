@@ -369,7 +369,6 @@ class SimulationEngine:
     def _generate_report(self) -> dict:
         """Generate the final report matching SimulationEngine.js output exactly."""
         equity_values = np.array([p["equity"] for p in self.equity_curve], dtype=np.float64)
-        gross_equity_values = np.array([p["grossEquity"] for p in self.equity_curve], dtype=np.float64)
         close_prices = np.array([c["close"] for c in self.visible_market_data], dtype=np.float64)
 
         final_value = self.equity_curve[-1]["equity"] if self.equity_curve else self.initial_capital

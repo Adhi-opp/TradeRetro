@@ -10,7 +10,7 @@ fetch the same way test_routers.py does.
 
 import sys
 import types
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np

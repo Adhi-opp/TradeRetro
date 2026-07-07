@@ -16,8 +16,8 @@ from models.responses import BacktestResponse
 def _make_candle(date: str, close: float, open_: float = None, high: float = None, low: float = None):
     o = open_ or close
     h = high or close
-    l = low or close
-    return {"date": date, "open": o, "high": h, "low": l, "close": close, "volume": 100_000}
+    lo = low or close
+    return {"date": date, "open": o, "high": h, "low": lo, "close": close, "volume": 100_000}
 
 
 def _rising_market(n: int = 300, start_price: float = 100.0, daily_pct: float = 0.002):

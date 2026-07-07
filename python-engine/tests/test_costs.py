@@ -5,7 +5,6 @@ Verify cost components match expected values and that the seeded PRNG
 produces deterministic, reproducible output.
 """
 
-import math
 
 import pytest
 

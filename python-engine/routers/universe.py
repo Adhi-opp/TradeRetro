@@ -14,7 +14,6 @@ by default) so the warehouse has data before the frontend tries to use it.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel

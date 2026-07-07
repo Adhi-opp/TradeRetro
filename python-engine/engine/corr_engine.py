@@ -122,8 +122,6 @@ def compute_rolling_corr(
             "available": int(returns.shape[0]),
         }
 
-    dates = returns.index
-
     series = []
     excluded = []
     base_ret = returns[base]

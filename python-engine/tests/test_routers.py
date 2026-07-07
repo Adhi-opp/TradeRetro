@@ -106,9 +106,16 @@ def test_ingest_status_not_found(client):
     assert resp.status_code == 404
 
 
+def _discard_coro(coro):
+    """Stand-in for asyncio.create_task that closes the coroutine instead of
+    leaking it (avoids 'coroutine was never awaited' RuntimeWarning)."""
+    coro.close()
+    return MagicMock()
+
+
 def test_ingest_eod_trigger_accepted(client):
     """POST /api/ingest/eod should accept and return flow_id, even without DB."""
-    with patch("routers.ingestion.asyncio.create_task"):
+    with patch("routers.ingestion.asyncio.create_task", side_effect=_discard_coro):
         resp = client.post("/api/ingest/eod", json={"tickers": ["RELIANCE.NS"]})
     assert resp.status_code == 200
     data = resp.json()
@@ -118,7 +125,7 @@ def test_ingest_eod_trigger_accepted(client):
 
 def test_ingest_backfill_trigger_accepted(client):
     """POST /api/ingest/backfill should accept with custom period."""
-    with patch("routers.ingestion.asyncio.create_task"):
+    with patch("routers.ingestion.asyncio.create_task", side_effect=_discard_coro):
         resp = client.post("/api/ingest/backfill", json={
             "tickers": ["SBIN.NS"],
             "period": "5y",
@@ -130,7 +137,7 @@ def test_ingest_backfill_trigger_accepted(client):
 
 def test_ingest_quality_trigger_accepted(client):
     """POST /api/ingest/quality-audit should accept."""
-    with patch("routers.ingestion.asyncio.create_task"):
+    with patch("routers.ingestion.asyncio.create_task", side_effect=_discard_coro):
         resp = client.post("/api/ingest/quality-audit", json={})
     assert resp.status_code == 200
     data = resp.json()

@@ -9,11 +9,9 @@ Usage:
 """
 
 import asyncio
-import json
 import logging
 import os
 import random
-import time as _time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -112,7 +110,6 @@ async def run_simulator(ticks_per_second: int = 10) -> None:
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-    from config import settings
     from services.redis_client import init_redis, xadd_tick
 
     await init_redis()
