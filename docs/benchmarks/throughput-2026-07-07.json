@@ -1,0 +1,68 @@
+[
+  {
+    "target_rate": 100,
+    "duration_sec": 20,
+    "produced": 2000,
+    "achieved_rate": 100.0,
+    "peak_lag": 23,
+    "peak_pending": 1,
+    "drain_time_sec": 0.0,
+    "e2e_latency_median_sec": 0.053,
+    "bronze_rows_landed": 2000
+  },
+  {
+    "target_rate": 500,
+    "duration_sec": 20,
+    "produced": 10000,
+    "achieved_rate": 500.0,
+    "peak_lag": 63,
+    "peak_pending": 50,
+    "drain_time_sec": 0.0,
+    "e2e_latency_median_sec": 0.053,
+    "bronze_rows_landed": 10000
+  },
+  {
+    "target_rate": 1000,
+    "duration_sec": 20,
+    "produced": 20000,
+    "achieved_rate": 1000.0,
+    "peak_lag": 214,
+    "peak_pending": 200,
+    "drain_time_sec": 0.0,
+    "e2e_latency_median_sec": 0.105,
+    "bronze_rows_landed": 20000
+  },
+  {
+    "target_rate": 2500,
+    "duration_sec": 20,
+    "produced": 50000,
+    "achieved_rate": 2499.9,
+    "peak_lag": 2417,
+    "peak_pending": 200,
+    "drain_time_sec": 0.0,
+    "e2e_latency_median_sec": 0.68,
+    "bronze_rows_landed": 50000
+  },
+  {
+    "target_rate": 5000,
+    "duration_sec": 20,
+    "produced": 100000,
+    "achieved_rate": 4999.9,
+    "peak_lag": 32308,
+    "peak_pending": 200,
+    "drain_time_sec": 8.79,
+    "e2e_latency_median_sec": 5.041,
+    "bronze_rows_landed": 100000
+  },
+  {
+    "target_rate": 10000,
+    "duration_sec": 20,
+    "produced": 200000,
+    "achieved_rate": 9999.4,
+    "peak_lag": 135252,
+    "peak_pending": 200,
+    "drain_time_sec": 38.18,
+    "e2e_latency_median_sec": 19.358,
+    "bronze_rows_landed": 200000
+  }
+]
