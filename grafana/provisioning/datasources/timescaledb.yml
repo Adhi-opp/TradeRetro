@@ -6,9 +6,9 @@ datasources:
     uid: timescaledb
     access: proxy
     url: timescaledb:5432
-    user: postgres
+    user: $__env{POSTGRES_USER}
     jsonData:
-      database: traderetro_raw
+      database: $__env{POSTGRES_DB}
       sslmode: disable
       maxOpenConns: 5
       maxIdleConns: 2
@@ -16,6 +16,6 @@ datasources:
       postgresVersion: 1600
       timescaledb: true
     secureJsonData:
-      password: postgres
+      password: $__env{POSTGRES_PASSWORD}
     isDefault: true
     editable: false
