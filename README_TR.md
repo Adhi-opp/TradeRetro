@@ -6,6 +6,8 @@ A high-throughput financial data pipeline and quantitative backtesting platform 
 
 Built as a Data Engineering portfolio project demonstrating production-grade streaming ETL, time-series warehousing, data-quality enforcement, and observability on real Indian equity market data.
 
+Why each piece of the stack was chosen (and what was rejected) is documented as ADRs in [docs/design-decisions.md](docs/design-decisions.md); throughput claims are backed by a reproducible benchmark in [docs/benchmarks/](docs/benchmarks/).
+
 ---
 
 ## Architecture
@@ -86,6 +88,33 @@ Built as a Data Engineering portfolio project demonstrating production-grade str
    │   React UI (5173)       Grafana (3000)        Prefect UI (4200)         │
    └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Measured Throughput
+
+The "high-throughput" claim is benchmarked, not asserted. A synthetic producer
+replicates the real write path (pipelined `XADD` + `HSET` mirror) at escalating
+rates while the production consumer drains into TimescaleDB
+([harness](python-engine/benchmarks/benchmark_throughput.py) ·
+[full report](docs/benchmarks/throughput-2026-07-07.md)):
+
+| Target rate | Peak backlog | Drain time | e2e latency (median) | Ticks lost |
+|---:|---:|---:|---:|---:|
+| 100/s | 23 | 0.0s | 53 ms | 0 |
+| 1,000/s | 214 | 0.0s | 105 ms | 0 |
+| 2,500/s | 2,417 | 0.0s | 680 ms | 0 |
+| 5,000/s | 32,308 | 8.8s | 5.0 s | 0 |
+| 10,000/s | 135,252 | 38.2s | 19.4 s | 0 |
+
+Real-time (sub-second tick→bronze) up to **~2,500 ticks/s**; the single
+consumer's `executemany` saturates at **≈ 3,450 inserts/s**, past which the
+Redis Stream buffers the burst and the consumer catches up — **zero ticks lost
+at 10,000/s** thanks to at-least-once delivery. NSE load for the subscribed 14
+instruments is tens of ticks/second, i.e. ~100× headroom. Measured on the
+reference single-host deployment (Docker Desktop, Windows, 16 GB).
+
+Reproduce: `docker compose exec api python benchmarks/benchmark_throughput.py`
 
 ---
 
