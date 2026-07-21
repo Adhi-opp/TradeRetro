@@ -56,24 +56,10 @@ export default function TradeTable({ trades, applyCosts = true }) {
 
   return (
     <div className="panel">
-      {/* Updated Header with Export Button */}
-      <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Trade Ledger</span>
-        <button 
-          onClick={handleExportCSV}
-          style={{
-            padding: '4px 10px',
-            backgroundColor: '#2563eb',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '600',
-            letterSpacing: '0.5px'
-          }}
-        >
-          ⬇ Export CSV
+      <div className="panel-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+        <span className="panel-title">Trade Ledger</span>
+        <button onClick={handleExportCSV} className="btn-secondary" style={{ height: '36px', padding: '0 12px' }}>
+          Export CSV
         </button>
       </div>
       

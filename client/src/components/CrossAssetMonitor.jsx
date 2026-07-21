@@ -106,7 +106,7 @@ function LiveTickerRow({ refreshSignal }) {
   if (apiError) {
     return (
       <div className="ticker-strip ticker-strip-error">
-        <AlertCircle size={14} /> {apiError} · is the Python API up on :8000?
+        <AlertCircle size={14} /> Live market service unavailable · start the Python API on :8000, then refresh.
       </div>
     );
   }
@@ -185,7 +185,7 @@ function VIXPanel({ refreshSignal }) {
           <div className="ca-empty-title">
             {status === 'error' ? 'Live API unreachable' : 'VIX not backfilled'}
           </div>
-          <div className="ca-empty-desc">{reason}</div>
+          <div className="ca-empty-desc">{reason === 'Failed to fetch' ? 'The live analytics API is offline.' : reason}</div>
         </div>
       </Panel>
     );
@@ -276,7 +276,7 @@ function SignalFeed({ refreshSignal }) {
     >
       <div className="ca-signal-list">
         {signals.length === 0 && (
-          <div className="ca-empty">{reason ? `No signals · ${reason}` : 'Scanning…'}</div>
+          <div className="ca-empty">{reason ? `No signals · ${reason === 'Failed to fetch' ? 'analytics API offline' : reason}` : 'Scanning…'}</div>
         )}
         {signals.map((s, i) => {
           const Icon = s.severity === 'bull' ? TrendingUp
@@ -362,7 +362,12 @@ function PriceChartPanel({ symbol, refreshSignal }) {
         </div>
       </div>
       {loading && <div className="ca-empty"><Loader size={14} className="spin-icon" /> Loading…</div>}
-      {!loading && error && <div className="ca-empty ca-empty-warn"><AlertCircle size={14} /> {error}</div>}
+      {!loading && error && (
+        <div className="ca-empty ca-empty-warn">
+          <AlertCircle size={14} />
+          {error === 'Failed to fetch' ? 'Price service unavailable. Start the Python API and refresh this chart.' : error}
+        </div>
+      )}
       {!loading && !error && data.length > 0 && (
         <div style={{ width: '100%', height: 220 }}>
           <ResponsiveContainer>
