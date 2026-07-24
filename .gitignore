@@ -27,3 +27,6 @@ pgdata/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Temporary OpenCode workspace
+.opencode/
