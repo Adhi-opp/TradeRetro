@@ -47,7 +47,7 @@ class AIService:
         metrics_data: Optional[Dict[str, Any]] = None,
         portfolio_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Generates an AI response object for a given user query and context inputs.
+        """Generates an AI response for a given user query and context inputs.
 
         Args:
             user_query: Raw user query string.
@@ -59,12 +59,11 @@ class AIService:
             portfolio_data: Optional portfolio context input data.
 
         Returns:
-            Structured response dictionary containing execution success, provider
-            metadata, user query, prompt string, context dictionary, and parsed
-            LLM response payload.
+            Dictionary containing execution success, provider metadata,
+            user query, prompt string, context dictionary, and parsed LLM
+            response payload.
         """
         try:
-            # 1. Build context dictionary
             context = self.context_builder.build(
                 market_data=market_data,
                 strategy_data=strategy_data,
@@ -73,16 +72,12 @@ class AIService:
                 portfolio_data=portfolio_data,
             )
 
-            # 2. Construct final LLM prompt string
             prompt = self.prompt_builder.build(user_query=user_query, context=context)
 
-            # 3. Retrieve LLM provider instance from factory
             provider = self.provider_factory.get_provider(provider_name)
 
-            # 4. Generate raw response string from provider
             raw_response_str = provider.generate_response(prompt)
 
-            # 5. Parse/Deserialize response payload
             try:
                 parsed_response = json.loads(raw_response_str)
             except (json.JSONDecodeError, TypeError):
@@ -95,6 +90,7 @@ class AIService:
                 "prompt": prompt,
                 "context": context,
                 "response": parsed_response,
+                "error": None,
             }
 
         except Exception as exc:

@@ -8,8 +8,11 @@ Tag: AI
 from fastapi import APIRouter
 
 from ai.models.chat import AIHealthResponse, GenerateRequest, GenerateResponse
+from ai.service import AIService
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
+
+ai_service = AIService()
 
 
 @router.get("/health", response_model=AIHealthResponse)
@@ -20,13 +23,14 @@ async def health() -> AIHealthResponse:
 
 @router.post("/generate", response_model=GenerateResponse)
 async def generate(body: GenerateRequest) -> GenerateResponse:
-    """Stub AI generate endpoint."""
-    return GenerateResponse(
-        success=True,
-        provider="stub",
+    """Generate an AI Copilot response using the full pipeline."""
+    result = ai_service.generate_response(
         user_query=body.user_query,
-        prompt="",
-        context=None,
-        response={"message": "AI endpoint is connected successfully."},
-        error=None,
+        provider_name=body.provider_name,
+        market_data=body.market_data,
+        strategy_data=body.strategy_data,
+        backtest_data=body.backtest_data,
+        metrics_data=body.metrics_data,
+        portfolio_data=body.portfolio_data,
     )
+    return GenerateResponse(**result)
