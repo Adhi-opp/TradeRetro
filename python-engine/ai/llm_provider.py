@@ -1,39 +1,34 @@
 """LLM Provider Abstraction Module.
 
-This module exports the BaseLLMProvider interface, MockLLMProvider implementation,
-and LLMProviderFactory for instantiating LLM providers.
+This module re-exports provider abstractions and provides the
+legacy LLMProviderFactory for backward compatibility.
 """
 
-from typing import Dict, Type
+from ai.provider_factory import AIProviderFactory
 from ai.providers.base_provider import BaseLLMProvider
 from ai.providers.mock_provider import MockLLMProvider
 
 
 class LLMProviderFactory:
-    """Factory for instantiating registered LLM provider instances."""
+    """Legacy factory that delegates to AIProviderFactory.
 
-    _providers: Dict[str, Type[BaseLLMProvider]] = {
-        "mock": MockLLMProvider,
-    }
+    .. deprecated::
+        Use :class:`AIProviderFactory` directly instead.
+    """
 
     def get_provider(self, provider_name: str = "mock") -> BaseLLMProvider:
         """Retrieves an instance of the specified LLM provider.
 
+        .. deprecated::
+            Delegates to :meth:`AIProviderFactory.get_provider`.
+
         Args:
-            provider_name: The string identifier of the requested provider (e.g., "mock").
+            provider_name: The model or provider identifier.
 
         Returns:
-            An instance of BaseLLMProvider.
-
-        Raises:
-            ValueError: If the requested provider_name is not supported.
+            An instance of :class:`BaseLLMProvider`.
         """
-        key = provider_name.lower().strip()
-        if key not in self._providers:
-            raise ValueError(
-                f"Unsupported LLM provider '{provider_name}'. Supported providers: {list(self._providers.keys())}"
-            )
-        return self._providers[key]()
+        return AIProviderFactory().get_provider(provider_name)
 
 
 __all__ = ["BaseLLMProvider", "MockLLMProvider", "LLMProviderFactory"]

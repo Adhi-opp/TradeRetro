@@ -12,11 +12,14 @@ class AIConfig:
     """Dataclass holding configuration parameters for AI Copilot."""
 
     enabled: bool = True
-    provider: str = "mock"
+    provider: str = "openai-compatible"
+    model: str = "qwen2.5-coder-1.5b-instruct"
     temperature: float = 0.2
     max_tokens: int = 1024
     timeout_seconds: int = 30
     debug: bool = False
+    openai_compatible_base_url: str = "http://localhost:1234"
+    openai_compatible_api_key: str = "not-needed"
 
 
 class AIConfigurationManager:

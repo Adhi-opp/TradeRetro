@@ -8,6 +8,7 @@ Tag: AI
 from fastapi import APIRouter
 
 from ai.models.chat import AIHealthResponse, GenerateRequest, GenerateResponse
+from ai.registry import list_models
 from ai.service import AIService
 
 router = APIRouter(prefix="/api/ai", tags=["AI"])
@@ -19,6 +20,13 @@ ai_service = AIService()
 async def health() -> AIHealthResponse:
     """AI module health check."""
     return AIHealthResponse(module="ai", status="initialized")
+
+
+@router.get("/models")
+async def list_available_models() -> list:
+    """Return all available models from the registry, including
+    any locally discovered Ollama models."""
+    return [m.__dict__ for m in list_models()]
 
 
 @router.post("/generate", response_model=GenerateResponse)

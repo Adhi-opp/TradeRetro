@@ -25,7 +25,7 @@ class ChatResponse(BaseModel):
 
 class GenerateRequest(BaseModel):
     user_query: str = Field(..., description="User query text")
-    provider_name: str = Field(default="mock", description="LLM provider identifier")
+    provider_name: str = Field(default="qwen2.5-coder-1.5b-instruct", description="LLM provider identifier")
     market_data: Optional[dict] = Field(default=None, description="Market context data")
     strategy_data: Optional[dict] = Field(default=None, description="Strategy context data")
     backtest_data: Optional[dict] = Field(default=None, description="Backtest context data")
