@@ -27,3 +27,5 @@ pgdata/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+.opencode/
