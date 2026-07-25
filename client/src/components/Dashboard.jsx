@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Menu, X, Pin, PinOff, Bell, Search } from 'lucide-react';
+import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Bot, Menu, X, Pin, PinOff, Bell, Search } from 'lucide-react';
 import ControlBar from './ControlBar';
 import StrategyConfig from './StrategyConfig';
 import TearsheetGrid from './TearsheetGrid';
@@ -7,6 +7,8 @@ import PipelineDashboard from './PipelineDashboard';
 import CrossAssetMonitor from './CrossAssetMonitor';
 import DataQualityDashboard from './DataQualityDashboard';
 import useBacktestStore from '../store/useBacktestStore';
+import useAIStore from '../store/useAIStore';
+import { CopilotPanel } from './copilot';
 
 function MarketClock() {
   const [now, setNow] = useState(() => new Date());
@@ -111,6 +113,8 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const loading = useBacktestStore((s) => s.loading);
+  const panelOpen = useAIStore((s) => s.panelOpen);
+  const togglePanel = useAIStore((s) => s.togglePanel);
 
   const isManual = mode === 'manual';
   const activePage = pageMeta[mode];
@@ -120,7 +124,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   };
 
   return (
-    <div className={`ide-shell app-shell-v2 ${sidebarPinned ? 'sidebar-pinned' : ''}`}>
+    <div className={`ide-shell app-shell-v2 ${sidebarPinned ? 'sidebar-pinned' : ''} ${panelOpen ? 'ai-panel-visible' : ''}`}>
       <aside className="ide-sidebar app-sidebar-v2" aria-label="Primary navigation">
         <div className="sidebar-brand" onClick={onLogoClick} title="Back to launch screen">
           <div className="brand-logo-icon" aria-hidden="true" />
@@ -143,6 +147,17 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
               <span>{label}</span>
             </button>
           ))}
+          <div className="sidebar-nav-divider" role="separator" />
+          <button
+            className={`sidebar-tab sidebar-ai-btn ${panelOpen ? 'active' : ''}`}
+            onClick={togglePanel}
+            title="AI Copilot"
+            aria-label="Toggle AI Copilot panel"
+            aria-pressed={panelOpen}
+          >
+            <Bot size={18} />
+            <span>AI Copilot</span>
+          </button>
         </nav>
 
         <div className="sidebar-project-card">
@@ -278,6 +293,8 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           </div>
         </div>
       )}
+
+      <CopilotPanel />
     </div>
   );
 }
