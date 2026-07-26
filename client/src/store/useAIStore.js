@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { generate } from '../services/aiService';
+import { buildAiContext } from '../services/aiContextBuilder';
+import useBacktestStore from './useBacktestStore';
 
 let _nextId = 1;
 function nextId() {
   return `msg_${Date.now()}_${_nextId++}`;
 }
 
-const useAIStore = create((set, get) => ({
+const useAIStore = create((set) => ({
   panelOpen: false,
   messages: [],
   loading: false,
@@ -41,7 +43,9 @@ const useAIStore = create((set, get) => ({
     }));
 
     try {
-      const data = await generate(trimmed);
+      const backtestState = useBacktestStore.getState();
+      const contextPayload = buildAiContext({ backtest: backtestState });
+      const data = await generate(trimmed, undefined, contextPayload);
 
       if (!data?.success) {
         throw new Error(data?.error || 'AI service returned an unsuccessful response.');
