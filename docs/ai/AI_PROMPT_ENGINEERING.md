@@ -119,6 +119,26 @@ Each guide is qualitative and threshold-free: for example, the Sharpe guide dist
 
 To add guidance for a new metric, append a `(name, guidance)` pair to `METRIC_INTERPRETATION_GUIDES` — no other changes are needed.
 
+### Cross-Metric Reasoning
+
+The section also teaches the model to reason across metrics so it behaves like an analyst reviewing a report rather than a list of isolated observations. Combination guidance is held in a second registry — `PromptBuilder.CROSS_METRIC_REASONING_GUIDES`, a tuple of `(combination, guidance)` pairs. It currently covers combinations such as:
+
+- High Return + High Drawdown
+- High Return + Low Drawdown
+- Low Win Rate + Positive Profit
+- High Win Rate + Poor Profitability
+- High Sharpe + Moderate Win Rate
+- High Trade Count + Weak Returns
+- Low Trade Count + Strong Returns
+- Smooth Equity + Moderate Return
+- Volatile Equity + High Return
+- Persistent Drawdown + Declining Equity Curve
+- Risk + Return
+
+These are reasoning principles, not lookup frames: they describe how pairs of signals change the interpretation of each other (e.g. low win rate with positive profit implies winners outweigh losers; high trade count with weak returns suggests overtrading and cost drag). A synthesis-principles block closes the section instructing the model to prefer synthesis over enumeration, connect observations, avoid repeating metric values, never invent metrics, and never infer missing strategy parameters.
+
+To add a new combination, append a `(combination, guidance)` pair to `CROSS_METRIC_REASONING_GUIDES` — no other changes are needed. Both registries share the same generic `_render_guide_block()` renderer.
+
 ## Reasoning Framework
 
 Unless the user's question requires a different format, responses should follow this flow:

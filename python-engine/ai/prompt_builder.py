@@ -234,18 +234,106 @@ class PromptBuilder:
         ),
     )
 
+    # Cross-metric reasoning guidance. Each entry is a (combination, guidance)
+    # pair teaching the model how combinations of metrics change interpretation.
+    # They are reasoning principles, not lookup templates: qualitative, threshold
+    # free, and meant to be adapted to the actual values in the context.
+    CROSS_METRIC_REASONING_GUIDES = (
+        (
+            "High Return + High Drawdown",
+            (
+                "- Strong profitability may have required substantial risk\n"
+                "- Returns should always be evaluated relative to the risk taken\n"
+                "- Returns earned through deep drawdown are weaker than the headline suggests"
+            ),
+        ),
+        (
+            "High Return + Low Drawdown",
+            (
+                "- Indicates efficient risk-adjusted performance\n"
+                "- Strong returns alongside shallow drawdown is evidence of disciplined capital preservation"
+            ),
+        ),
+        (
+            "Low Win Rate + Positive Profit",
+            (
+                "- Average winning trades likely exceed average losing trades\n"
+                "- Profitability can persist with a low win rate when winners are large enough\n"
+                "- This pattern is common among trend-following systems"
+            ),
+        ),
+        (
+            "High Win Rate + Poor Profitability",
+            (
+                "- Frequent small gains may be offset by occasional large losses\n"
+                "- The relative size of winners to losers matters more than the share of winners"
+            ),
+        ),
+        (
+            "High Sharpe Ratio + Moderate Win Rate",
+            (
+                "- Consistency and risk-adjusted return matter more than raw win percentage\n"
+                "- A moderate win rate should not discount a strategy with a solid risk-adjusted profile"
+            ),
+        ),
+        (
+            "High Trade Count + Weak Returns",
+            (
+                "- May indicate persistent overtrading\n"
+                "- Transaction costs may materially affect performance\n"
+                "- Frequent trading without a proportional edge erodes net returns"
+            ),
+        ),
+        (
+            "Low Trade Count + Strong Returns",
+            (
+                "- Results may be promising but statistical confidence is limited\n"
+                "- A small trade sample remains vulnerable to noise and luck"
+            ),
+        ),
+        (
+            "Smooth Equity Curve + Moderate Return",
+            (
+                "- May indicate consistency and disciplined risk management\n"
+                "- Steady growth without deep drawdown can be more attractive than "
+                "uneven high-growth equity"
+            ),
+        ),
+        (
+            "Volatile Equity Curve + High Return",
+            (
+                "- Investigate whether the additional return justifies the variability\n"
+                "- Evaluate the return per unit of volatility, not just the headline return"
+            ),
+        ),
+        (
+            "Persistent Drawdown + Declining Equity Curve",
+            (
+                "- The strategy may be structurally unsuitable for the evaluated market regime\n"
+                "- Caution is warranted before relying on historical results"
+            ),
+        ),
+        (
+            "Risk + Return",
+            (
+                "- Never discuss risk or return in isolation\n"
+                "- Frame return in relation to the risk required to earn it"
+            ),
+        ),
+    )
+
     @staticmethod
-    def _render_metric_guide(name: str, guidance: str) -> str:
-        """Renders a single metric interpretation guide block.
+    def _render_guide_block(label: str, guidance: str) -> str:
+        """Renders a single named guide block (metric or cross-metric).
 
         Args:
-            name: Display name of the metric.
-            guidance: Qualitative interpretation guidance lines.
+            label: Display label for the block (metric name or combination).
+            guidance: Qualitative reasoning guidance lines.
 
         Returns:
             A single formatted guide block.
         """
-        return f"{name}\n{guidance}"
+        return f"{label}\n{guidance}"
 
     @classmethod
     def _build_metric_guides(cls) -> str:
@@ -254,21 +342,60 @@ class PromptBuilder:
         Returns:
             Newline-joined blocks, one per registered metric.
         """
-        blocks = [cls._render_metric_guide(name, guide)
+        blocks = [cls._render_guide_block(name, guide)
                   for name, guide in cls.METRIC_INTERPRETATION_GUIDES]
         return "\n\n".join(blocks)
 
+    @classmethod
+    def _build_cross_metric_guides(cls) -> str:
+        """Renders all registered cross-metric reasoning guide blocks.
+
+        Returns:
+            Newline-joined blocks, one per registered combination.
+        """
+        blocks = [cls._render_guide_block(combination, guide)
+                 for combination, guide in cls.CROSS_METRIC_REASONING_GUIDES]
+        return "\n\n".join(blocks)
+
+    def _build_cross_metric_reasoning(self) -> str:
+        """Returns the cross-metric reasoning guidance block.
+
+        Returns:
+            Framing text, per-combination guides, and synthesis principles.
+        """
+        return (
+            "Cross-metric reasoning:\n"
+            "\n"
+            "When multiple metrics are present, reason across them together. "
+            "Combinations of metrics change the interpretation "
+            "of individual values, so synthesize the evidence rather than "
+            "listing isolated observations.\n"
+            "\n"
+            f"{self._build_cross_metric_guides()}\n"
+            "\n"
+            "Cross-metric synthesis principles:\n"
+            "- Prefer synthesis over isolated observations\n"
+            "- Connect observations together\n"
+            "- Avoid repeating metric values already in the context\n"
+            "- Avoid generic investment advice\n"
+            "- Never recommend actions unsupported by the provided context\n"
+            "- Only reason from the supplied context\n"
+            "- Never invent metrics\n"
+            "- Never infer missing strategy parameters"
+        )
+
     def _build_quantitative_analysis_rules(self) -> str:
-        """Returns the reasoning principles and metric interpretation
-        guidance for quantitative analysis.
+        """Returns the reasoning principles, metric interpretation guidance, and
+        cross-metric reasoning guidance for quantitative analysis.
 
         Returns:
             Principles describing how the assistant should reason about
-            metrics rather than hardcoded output templates.
+            the quantitative context holistically rather than hardcoded
+            output templates.
         """
         return (
             "Reason from the relationships between metrics.\n"
-            "Avoid discussing isolated numbers without interpretation.\n"
+            "Avoid discussing isolated numbers without interpreting them.\n"
             "\n"
             "Interpretation principles:\n"
             "- Assess profitability relative to drawdown, not in isolation\n"
@@ -279,6 +406,8 @@ class PromptBuilder:
             "Metric interpretation guidance:\n"
             "\n"
             f"{self._build_metric_guides()}\n"
+            "\n"
+            f"{self._build_cross_metric_reasoning()}\n"
             "\n"
             "Only interpret metrics that are actually present in the injected context. "
             "If a metric is absent, ignore it and move on — never assume, require, or infer it.\n"

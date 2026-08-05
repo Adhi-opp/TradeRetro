@@ -126,7 +126,7 @@ Assembles the seven-section prompt string sent to every LLM call. Sections are s
 
 1. **SYSTEM IDENTITY** — Persona ("TradeRetro AI") plus specialization and role boundaries
 2. **CORE BEHAVIOUR RULES** — Hard integrity constraints (no fabrication, no speculation)
-3. **QUANTITATIVE ANALYSIS RULES** — Relationship principles plus per-metric interpretation guidance held in the `METRIC_INTERPRETATION_GUIDES` registry (Net Profit, Total Return, Max Drawdown, Sharpe, Sortino, Win Rate, Profit Factor, Trade Count, Average Trade, Hold Period, Volatility, Risk vs Return, Equity Curve)
+3. **QUANTITATIVE ANALYSIS RULES** — Relationship principles, per-metric interpretation guidance held in `METRIC_INTERPRETATION_GUIDES` (Net Profit, Total Return, Max Drawdown, Sharpe, Sortino, Win Rate, Profit Factor, Trade Count, Average Trade, Hold Period, Volatility, Risk vs Return, Equity Curve), plus cross-metric combination guidance held in `CROSS_METRIC_REASONING_GUIDES` (e.g. High Return + High Drawdown, Low Win Rate + Positive Profit, High Trade Count + Weak Returns)
 4. **REASONING FRAMEWORK** — Standard response flow (Summary → Observations → Interpretation → Risk → Strengths → Weaknesses → Suggestions → Limitations)
 5. **FORMATTING RULES** — Markdown, headings, concise professional documentation style
 6. **CONTEXT DATA** — Each domain rendered as `[Label] (Source: ...)` with data or "Data Not Available"
