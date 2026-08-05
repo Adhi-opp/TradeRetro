@@ -139,6 +139,30 @@ These are reasoning principles, not lookup frames: they describe how pairs of si
 
 To add a new combination, append a `(combination, guidance)` pair to `CROSS_METRIC_REASONING_GUIDES` — no other changes are needed. Both registries share the same generic `_render_guide_block()` renderer.
 
+### Strategy-Aware Reasoning
+
+The section teaches the model the typical qualitative profile of strategy families so it can relate observed metrics to family behaviour instead of describing strategies in the abstract. Profiles are held in a third registry — `PromptBuilder.STRATEGY_REASONING_GUIDES`, a tuple of `(family, guidance)` pairs. It currently covers:
+
+- SMA Crossover (project type `MOVING_AVERAGE_CROSSOVER`)
+- EMA Crossover
+- Trend Following
+- Momentum
+- Mean Reversion
+- RSI-based (project type `RSI`)
+- Breakout
+- Volatility-based
+- MACD (project type `MACD`)
+- Bollinger Breakout (project type `BOLLINGER_BREAKOUT`)
+- Donchian Breakout (project type `DONCHIAN_BREAKOUT`)
+
+Each profile describes typical strengths, typical weaknesses, market environments where the family often performs well or commonly struggles, risk characteristics, and typical behaviour across trending, sideways, high-volatility, and low-volatility markets. Profiles are **probabilistic priors** — the reasoning block forbids "always"/"guarantees" language (guidance uses often/may/commonly/typically/can) and never supplies trading rules, implementation logic, or trade signals. Project strategy-type codes are included in the labels so the model can recognize families that appear in the injected strategy context.
+
+When strategy context is present, the model is directed to relate the supplied metrics to the family's typical profile (e.g. a low win rate is not necessarily inconsistent with trend-following behaviour if profitability is supported by larger average winners). When strategy context is absent, the model must not assume the family.
+
+Note that this block intentionally stops short of market-regime or instrument-specific reasoning, per milestone scope.
+
+To add a new strategy family, append a `(family, guidance)` pair to `STRATEGY_REASONING_GUIDES` — no other changes are needed.
+
 ## Reasoning Framework
 
 Unless the user's question requires a different format, responses should follow this flow:

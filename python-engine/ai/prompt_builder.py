@@ -322,6 +322,136 @@ class PromptBuilder:
         ),
     )
 
+    # Strategy-family reasoning guidance. Each entry is a
+    # (family, guidance) pair teaching the model the typical qualitative
+    # profile of a strategy family. Characteristics are probabilistic
+    # priors ("often", "may", "commonly"), never guarantees. Labels for
+    # families that map to project strategy types include the type code.
+    # Extend this registry with a new entry when a strategy family is added.
+    STRATEGY_REASONING_GUIDES = (
+        (
+            "SMA Crossover (MOVING_AVERAGE_CROSSOVER)",
+            (
+                "- Typical strengths: clear, systematic trend signals that smooth market noise and are easy to interpret\n"
+                "- Typical weaknesses: lagging signals that react late to reversals and suffer whipsaws in choppy markets\n"
+                "- Often performs well in: sustained trending markets\n"
+                "- Commonly struggles in: sideways, range-bound markets\n"
+                "- Risk characteristics: moderate; repeated small whipsaw losses when no trend is present; deeper drawdowns during strong adverse moves\n"
+                "- Typical behaviour: trending markets: captures a meaningful portion of sustained moves; sideways markets: frequent small losses and a lower win rate; highly volatile markets: whipsaw risk and erratic signals; low-volatility markets: few signals and a mostly flat equity curve"
+            ),
+        ),
+        (
+            "EMA Crossover",
+            (
+                "- Typical strengths: reacts faster than SMA crossovers, producing earlier entries and exits\n"
+                "- Typical weaknesses: greater sensitivity to noise can create more signals than the underlying move justifies\n"
+                "- Often performs well in: moderately trending markets with limited chop\n"
+                "- Commonly struggles in: sideways markets, where faster signals produce more whipsaws\n"
+                "- Key characteristics: generally similar to SMA crossovers but with earlier timing and more frequent trading\n"
+                "- Typical behaviour: trending markets: earlier capture of moves at the cost of more false starts; sideways markets: more whipsaws than a slower equivalent; high-volatility markets: noisy signal flow; low-volatility markets: fewer, cleaner signals"
+            ),
+        ),
+        (
+            "Trend Following",
+            (
+                "- Typical strengths: profits from major directional moves and can tolerate a long sequence of small losses\n"
+                "- Typical weaknesses: endures extended drawdowns and stagnation when no trend is present; typically lower win rates\n"
+                "- Often performs well in: strong, sustained trending markets\n"
+                "- Commonly struggles in: sideways, oscillating markets\n"
+                "- Key characteristics: frequent small losses offset by intermittent larger winners; equity can stay flat or decline for long stretches before recovering\n"
+                "- Typical behaviour: trending markets: steady gains as the trend is captured; sideways markets: persistent small losses; high-volatility markets: erratic results with occasional large swings; low-volatility markets: few signals and prolonged stagnation"
+            ),
+        ),
+        (
+            "Momentum",
+            (
+                "- Typical strengths: aligns with persistent price behaviour and can deliver strong returns in trending phases\n"
+                "- Typical weaknesses: sudden reversals can produce sharp losses, and crowded momentum trades may unwind violently\n"
+                "- Often performs well in: trending markets and periods of strong directional momentum\n"
+                "- Commonly struggles in: choppy, reversal-heavy markets\n"
+                "- Typical characteristics: gains concentrated in bursts; drawdowns can be sharp when momentum flips\n"
+                "- Typical behaviour: trending markets: strong results; sideways markets: frequent false signals; high-volatility markets: large swings in both directions; low-volatility markets: weak or absent signals"
+            ),
+        ),
+        (
+            "Mean Reversion",
+            (
+                "- Typical strengths: profitable in range-bound markets with frequent, smaller winning trades and often a higher win rate\n"
+                "- Typical weaknesses: suffers when a sustained trend develops because the strategy is positioned against it\n"
+                "- Often performs well in: sideways, oscillating markets\n"
+                "- Commonly struggles in: strong directional trends\n"
+                "- Typical characteristics: steady smaller gains punctuated by occasional severe losses when the trend dominates\n"
+                "- Typical behaviour: sideways markets: steady gains; trending markets: sustained losses; high-volatility markets: mixed with whipsaw risk; low-volatility markets: steadier but smaller returns"
+            ),
+        ),
+        (
+            "RSI-based (RSI)",
+            (
+                "- Typical strengths: clear overbought and oversold signals that work reasonably in ranging markets\n"
+                "- Typical weaknesses: can enter prematurely against a strong trend and can stay in overbought or oversold states for prolonged periods\n"
+                "- Often performs well in: ranging markets with regular oscillations\n"
+                "- Commonly struggles in: sustained, one-directional trends\n"
+                "- Typical characteristics: counter-trend entries that can accumulate losses while momentum persists\n"
+                "- Typical behaviour: trending markets: mistimed or late signals; sideways markets: frequent gains; high-volatility markets: noisy signals; low-volatility markets: infrequent, marginal signals"
+            ),
+        ),
+        (
+            "Breakout",
+            (
+                "- Typical strengths: catches the start of meaningful moves and performs well when volatility expands and fresh ranges form\n"
+                "- Typical weaknesses: susceptible to false breakouts and whipsaws in choppy markets\n"
+                "- Often performs well in: trending markets and volatility expansions\n"
+                "- Commonly struggles in: mean-reverting, choppy conditions\n"
+                "- Typical characteristics: repeated small losses from false breakouts punctuated by larger winners from genuine ones\n"
+                "- Typical behaviour: trending markets: strong capture of early moves; sideways markets: false breakouts; high-volatility markets: frequent triggers with mixed outcomes; low-volatility markets: few triggers and a flat curve"
+            ),
+        ),
+        (
+            "Volatility-based",
+            (
+                "- Typical strengths: adapts behaviour to prevailing volatility, avoiding low-activity chop and engaging when volatility expands\n"
+                "- Typical weaknesses: signals can cluster, can be sensitive to how volatility is estimated, and can mis-tune during regime transitions\n"
+                "- Often performs well in: volatile markets and volatility expansions\n"
+                "- Commonly struggles in: quiet, low-volatility markets\n"
+                "- Typical characteristics: activity scales with volatility; volatility spikes can amplify both gains and losses\n"
+                "- Typical behaviour: volatile trending markets: strong activity; quiet markets: inactivity and stagnation; high-volatility markets: larger swings; low-volatility markets: few signals"
+            ),
+        ),
+        (
+            "MACD (MACD)",
+            (
+                "- Typical strengths: combines trend and momentum confirmation, giving signals that are smoother than raw price crossovers\n"
+                "- Typical weaknesses: still a lagging indicator and subject to whipsaws in choppy markets\n"
+                "- Often performs well in sustained trends with momentum confirmation\n"
+                "- Commonly struggles in sideways markets with misleading histogram crossings\n"
+                "- Typical characteristics: behaves like a trend-momentum hybrid; signal quality degrades when momentum and price diverge\n"
+                "- Typical behaviour: trending markets: reliable trend phases; sideways markets: whipsaws; high-volatility markets: noisier signals; low-volatility markets: few, stronger signals"
+            ),
+        ),
+        (
+            "Bollinger Breakout (BOLLINGER_BREAKOUT)",
+            (
+                "- Typical strengths: identifies volatility expansions and fresh ranges early through band breakouts\n"
+                "- Typical weaknesses: false breakouts in tight ranges and slow reaction inside the bands\n"
+                "- Often performs well in: trending markets with expanding volatility\n"
+                "- Commonly struggles in: narrow, pattern-less ranges without a directional move\n"
+                "- Typical characteristics: band contraction followed by expansion can foreshadow larger moves\n"
+                "- Typical behaviour: trending markets: early movement capture; sideways markets: false breakouts; high-volatility markets: decisive triggers; low-volatility markets: low activity with compression signals"
+            ),
+        ),
+        (
+            "Donchian Breakout (DONCHIAN_BREAKOUT)",
+            (
+                "- Typical strengths: clear, systematic channel-breakout signals that have historically aligned with strong trends\n"
+                "- Typical weaknesses: exposed to whipsaws when fresh highs and lows are quickly reversed\n"
+                "- Often performs well in: persistent trending markets\n"
+                "- Commonly struggles in: ranging, choppy markets\n"
+                "- Typical characteristics: behaves like a pure trend-channel strategy with disciplined but blunt signals\n"
+                "- Typical behaviour: trending markets: good trend capture; sideways markets: alternating false breaks; high-volatility markets: volatile signals; low-volatility markets: slow signals and inactivity"
+            ),
+        ),
+    )
+
     @staticmethod
     def _render_guide_block(label: str, guidance: str) -> str:
         """Renders a single named guide block (metric or cross-metric).
@@ -357,6 +487,17 @@ class PromptBuilder:
                  for combination, guide in cls.CROSS_METRIC_REASONING_GUIDES]
         return "\n\n".join(blocks)
 
+    @classmethod
+    def _build_strategy_guides(cls) -> str:
+        """Renders all registered strategy-family reasoning guide blocks.
+
+        Returns:
+            Newline-joined blocks, one per registered strategy family.
+        """
+        blocks = [cls._render_guide_block(family, guide)
+                 for family, guide in cls.STRATEGY_REASONING_GUIDES]
+        return "\n\n".join(blocks)
+
     def _build_cross_metric_reasoning(self) -> str:
         """Returns the cross-metric reasoning guidance block.
 
@@ -384,9 +525,42 @@ class PromptBuilder:
             "- Never infer missing strategy parameters"
         )
 
+    def _build_strategy_reasoning(self) -> str:
+        """Returns the strategy-aware reasoning guidance block.
+
+        Returns:
+            Framing text, per-family guides, and strategy reasoning
+            principles.
+        """
+        return (
+            "Strategy-aware reasoning:\n"
+            "\n"
+            "When strategy context is supplied, relate the observed metrics "
+            "to the typical behaviour of the strategy family. The family "
+            "profiles below are interpretation priors — probabilistic, not "
+            "deterministic: they calibrate expectations, they never dictate "
+            "conclusions.\n"
+            "\n"
+            f"{self._build_strategy_guides()}\n"
+            "\n"
+            "Strategy reasoning principles:\n"
+            "- Relate the supplied metrics to the family's typical behaviour "
+            "instead of describing the family in the abstract\n"
+            "- Use probabilistic language: often, may, commonly, typically, "
+            "can — never always or guarantees\n"
+            "- The observed metrics may be consistent or inconsistent with the "
+            "family's typical profile; either outcome is worth stating\n"
+            "- Never generate trading signals or recommend buying or selling assets\n"
+            "- Never provide implementation logic or trading rules\n"
+            "- Never invent strategy parameters, indicators, leverage, "
+            "stop-loss logic, or portfolio allocation beyond the supplied context\n"
+            "- If no strategy context is supplied, do not assume the strategy family"
+        )
+
     def _build_quantitative_analysis_rules(self) -> str:
-        """Returns the reasoning principles, metric interpretation guidance, and
-        cross-metric reasoning guidance for quantitative analysis.
+        """Returns the reasoning principles, metric interpretation guidance,
+        cross-metric reasoning, and strategy-aware reasoning guidance for
+        quantitative analysis.
 
         Returns:
             Principles describing how the assistant should reason about
@@ -408,6 +582,8 @@ class PromptBuilder:
             f"{self._build_metric_guides()}\n"
             "\n"
             f"{self._build_cross_metric_reasoning()}\n"
+            "\n"
+            f"{self._build_strategy_reasoning()}\n"
             "\n"
             "Only interpret metrics that are actually present in the injected context. "
             "If a metric is absent, ignore it and move on — never assume, require, or infer it.\n"
