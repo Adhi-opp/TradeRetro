@@ -158,10 +158,16 @@ class SimulationEngine:
                 pending_signal = "SELL"
 
         # Force close remaining position at the last available close (no next
-        # bar to open into).
+        # bar to open into).  Update the last equity-curve entry so the final
+        # portfolio value reflects the closed position, including exit costs.
         if self.holdings > 0:
             last = self.visible_market_data[-1]
             self._execute_sell(last["close"], last["date"], exit_reason="force_close")
+            if self.equity_curve:
+                self.equity_curve[-1]["equity"] = self.cash
+                self.equity_curve[-1]["grossEquity"] = self.cash + self.total_costs["grossTotal"]
+                self.equity_curve[-1]["cash"] = self.cash
+                self.equity_curve[-1]["holdings"] = 0
 
         return self._generate_report()
 

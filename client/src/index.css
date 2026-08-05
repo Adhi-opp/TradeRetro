@@ -1,4 +1,5 @@
 /* ── TradeRetro Design System ─────────────────────────────── */
+@import "tailwindcss";
 
 :root,
 [data-theme="dark"] {
@@ -2403,15 +2404,90 @@ body {
 
 /* ─── Ticker Input (free-text + autocomplete + add-to-universe) ─── */
 .ticker-input { position: relative; }
-.ticker-input-row {
+.ticker-select-row {
   display: flex;
   gap: 6px;
   align-items: stretch;
 }
-.ticker-input-row input {
+.ticker-select {
   flex: 1;
   min-width: 0;
+  min-height: 42px;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  background: #17181d;
+  color: #fff;
+  font-family: Inter, var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  appearance: auto;
+  -webkit-appearance: auto;
 }
+.ticker-select:hover { border-color: rgba(255,255,255,0.16); background: #1e1f24; }
+.ticker-select:focus { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.12); outline: none; }
+.ticker-open-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  background: var(--accent,#00c9a7);
+  color: #0d0f0e;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: filter 150ms;
+  flex-shrink: 0;
+}
+.ticker-open-add-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.ticker-open-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ticker-add-panel {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  background: #1a1b22;
+}
+.ticker-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ticker-add-row input {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: #17181d;
+  color: #fff;
+  font-family: Inter, var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ticker-cancel-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  min-height: 36px;
+  background: transparent;
+  color: var(--text-secondary,#8a8f9d);
+  font-weight: 600;
+  font-size: 0.72rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 150ms;
+}
+.ticker-cancel-btn:hover { border-color: rgba(255,255,255,0.2); }
 .ticker-add-btn {
   display: flex;
   align-items: center;
@@ -5355,9 +5431,10 @@ body {
 .control-bar select,
 .strategy-config input,
 .strategy-config select,
-.ticker-input-row input {
+.ticker-select {
   width: 100%;
   min-height: 42px;
+  height: 42px;
   padding: 0 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -5373,7 +5450,7 @@ body {
 .control-bar select:hover,
 .strategy-config input:hover,
 .strategy-config select:hover,
-.ticker-input-row input:hover {
+.ticker-select:hover {
   border-color: rgba(255, 255, 255, 0.16);
   background: #1e1f24;
 }
@@ -5382,7 +5459,7 @@ body {
 .control-bar select:focus,
 .strategy-config input:focus,
 .strategy-config select:focus,
-.ticker-input-row input:focus {
+.ticker-select:focus {
   border-color: #f59e0b;
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
 }
@@ -8726,19 +8803,19 @@ tbody tr:hover {
   overflow: hidden !important;
 }
 
-.ticker-input-row {
+.ticker-select-row {
   display: flex !important;
   gap: 6px !important;
   width: 100% !important;
 }
 
-.ticker-input-row input {
+.ticker-select {
   flex: 1 !important;
   min-width: 0 !important;
   width: 0 !important;
 }
 
-.ticker-add-btn {
+.ticker-open-add-btn {
   flex-shrink: 0 !important;
   white-space: nowrap !important;
 }
@@ -8855,7 +8932,8 @@ html, body, #root {
 }
 
 .app-shell-v2 input,
-.app-shell-v2 select {
+.app-shell-v2 select,
+.app-shell-v2 .ticker-select {
   min-height: 44px !important;
   height: 44px !important;
 }

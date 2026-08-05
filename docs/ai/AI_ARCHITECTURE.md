@@ -84,7 +84,7 @@ All dependencies are injected via the constructor and default to fresh instances
 
 ### 4. Prompt Construction — `ai/prompt_builder.py`
 
-`PromptBuilder` assembles four sections delimited by `=` rulers: system instruction (persona + constraints), context data (rendered domain blocks), output rules (formatting, citations, no speculation), and the user's question. Safety rules prohibit fabrication, financial advice, and trade execution. The older `build()` method injects the user query into context for callers that haven't migrated to `build_prompt()`.
+`PromptBuilder` assembles seven sections delimited by `=` rulers: system identity (persona + specialization), core behaviour rules (integrity constraints), quantitative analysis rules (metric interpretation principles), reasoning framework, formatting rules (markdown/citations/no speculation), context data (rendered domain blocks), and the user's question. Each section is built by a dedicated private helper and wrapped by a shared `_section(title, body)` method. Safety rules prohibit fabrication, hallucination, price prediction, and trade recommendations. The older `build()` method injects the user query into context for callers that haven't migrated to `build_prompt()`.
 
 ### 5. Provider Factory — `ai/provider_factory.py`
 
@@ -109,7 +109,9 @@ User Request (POST /api/ai/generate)
         ├── 2a. ContextBuilder.build() → unified context dict (6 domains + metadata)
         │
         ├── 2b. PromptBuilder.build() → complete prompt string
-        │       (SYSTEM INSTRUCTION + CONTEXT DATA + OUTPUT RULES + USER QUESTION)
+        │       (SYSTEM IDENTITY + CORE BEHAVIOUR RULES + QUANTITATIVE ANALYSIS
+        │        RULES + REASONING FRAMEWORK + FORMATTING RULES + CONTEXT DATA
+        │        + USER QUESTION)
         │
         └── 2c. AIProviderFactory.get_provider(provider_name)
                 │

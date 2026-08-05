@@ -122,16 +122,21 @@ The envelope design means the PromptBuilder can check `domain["available"]` with
 
 ## `prompt_builder.py`
 
-Assembles the four-section prompt string sent to every LLM call. Sections are separated by 60-character `=` dividers:
+Assembles the seven-section prompt string sent to every LLM call. Sections are separated by 60-character `=` dividers:
 
-1. **SYSTEM INSTRUCTION** — Persona ("TradeRetro AI Copilot") plus behavioral rules
-2. **CONTEXT DATA** — Each domain rendered as `[Label] (Source: ...)` with data or "Data Not Available"
-3. **OUTPUT RULES** — Formatting guidelines (markdown, cite sources, no speculation)
-4. **USER QUESTION** — Extracted from the context's `user.message`
+1. **SYSTEM IDENTITY** — Persona ("TradeRetro AI") plus specialization and role boundaries
+2. **CORE BEHAVIOUR RULES** — Hard integrity constraints (no fabrication, no speculation)
+3. **QUANTITATIVE ANALYSIS RULES** — Reasoning principles for metric interpretation
+4. **REASONING FRAMEWORK** — Standard response flow (Summary → Observations → Interpretation → Risk → Strengths → Weaknesses → Suggestions → Limitations)
+5. **FORMATTING RULES** — Markdown, headings, concise professional documentation style
+6. **CONTEXT DATA** — Each domain rendered as `[Label] (Source: ...)` with data or "Data Not Available"
+7. **USER QUESTION** — Extracted from the context's `user.message`
 
 Unavailable domains show "Data Not Available" rather than being omitted. This keeps the prompt structure predictable and signals to the model that certain data genuinely wasn't provided, reducing hallucination risk.
 
 **Primary API:** `build_prompt(context)`. The older `build(user_query, context)` injects the query into the context dict before delegating.
+
+Each numbered section is assembled by a dedicated private helper (`_build_system_identity`, `_build_core_behaviour_rules`, `_build_quantitative_analysis_rules`, `_build_reasoning_framework`, `_build_formatting_rules`, `_build_context`, `_build_user_prompt`) and wrapped with the shared `_section(title, body)` method, which emits the 60-character `=` dividers. This keeps the structure easy to extend for future milestones.
 
 Only stdlib `copy` is required. The module is consumed exclusively by `service.py`.
 
