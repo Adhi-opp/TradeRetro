@@ -96,8 +96,171 @@ class PromptBuilder:
 
     # ── Section 3: Quantitative Analysis Rules ──────────────────
 
+    # Per-metric interpretation guidance. Each entry is a (name, guidance)
+    # pair teaching the model how to reason about that metric. Guidance is
+    # qualitative on purpose: no rigid thresholds and no canned answers.
+    # Extend this registry with a new entry when a future milestone adds
+    # another metric.
+    METRIC_INTERPRETATION_GUIDES = (
+        (
+            "Net Profit",
+            (
+                "- The absolute profit or loss earned over the backtest period\n"
+                "- Always interpret alongside drawdown, volatility, and capital deployed\n"
+                "- A large profit achieved through deep drawdown is lower quality than "
+                "a smaller profit earned with shallow drawdown\n"
+                "- Consider how the profit was earned: steady accumulation versus a few large winners"
+            ),
+        ),
+        (
+            "Total Return",
+            (
+                "- The overall gain or loss relative to starting capital\n"
+                "- Interpret it relative to the length of the backtest period and the risk taken\n"
+                "- A high total return with deep drawdown or high volatility is weaker than "
+                "a comparable return achieved smoothly\n"
+                "- Returns across different periods or market regimes should not be compared directly"
+            ),
+        ),
+        (
+            "Maximum Drawdown",
+            (
+                "- Shallow drawdown: resilient equity, lower tail risk; attractive if returns remain adequate\n"
+                "- Moderate drawdown: generally within expectations for the asset class; acceptable if recovery is timely\n"
+                "- Severe drawdown: elevated tail risk or weak risk control; scrutinize whether the returns justify the decline\n"
+                "- Always interpret drawdown relative to returns — the reward must be weighed against the depth of decline\n"
+                "- Consider how quickly the curve recovered from the peak-to-trough decline"
+            ),
+        ),
+        (
+            "Sharpe Ratio",
+            (
+                "- Measures return earned per unit of total volatility\n"
+                "- High: strong compensation for the level of risk borne\n"
+                "- Moderate: reasonable return per unit of risk, often typical of diversified strategies\n"
+                "- Low: the return does not clearly compensate for the risk taken\n"
+                "- Negative: returns fell short of the risk-free baseline\n"
+                "- Treat values qualitatively and avoid rigid thresholds\n"
+                "- A value based on very few trades is not statistically meaningful"
+            ),
+        ),
+        (
+            "Sortino Ratio",
+            (
+                "- Measures return per unit of downside deviation only\n"
+                "- Higher values indicate returns achieved without excessive downside exposure\n"
+                "- Compare it with the Sharpe ratio: a large gap between the two signals "
+                "asymmetric downside risk, where returns rely on favourable volatility"
+            ),
+        ),
+        (
+            "Win Rate",
+            (
+                "- The share of trades that ended profitably\n"
+                "- A high win rate alone does not imply profitability\n"
+                "- A low win rate can still be profitable when average winners outweigh average losers\n"
+                "- Interpret together with average trade, profit factor, and the average winner versus average loser size"
+            ),
+        ),
+        (
+            "Profit Factor",
+            (
+                "- Gross profit divided by gross loss\n"
+                "- Above a value of 1 the strategy profits in aggregate; below 1 it loses\n"
+                "- Higher values point to a stronger edge\n"
+                "- Interpret with trade count: a high value built on very few trades is unreliable\n"
+                "- Check consistency — an edge concentrated in a few outsized winners is fragile"
+            ),
+        ),
+        (
+            "Trade Count",
+            (
+                "- Few trades: lower statistical confidence; the results may reflect noise or luck\n"
+                "- Many trades: greater confidence in the statistics, but watch for overtrading, "
+                "overfitting and dependence on a single market regime\n"
+                "- Judge the activity level relative to the strategy type and the length of the backtest period"
+            ),
+        ),
+        (
+            "Average Trade",
+            (
+                "- The mean profit or loss per trade\n"
+                "- A positive average trade across many trades suggests a durable edge\n"
+                "- An average trade that is small relative to the risk taken per trade indicates "
+                "a marginal edge that is sensitive to transaction costs\n"
+                "- Interpret it alongside the trade count and win rate"
+            ),
+        ),
+        (
+            "Average Hold Period",
+            (
+                "- The typical length of time a position is held\n"
+                "- Short holds: the strategy is sensitive to transaction costs, slippage and execution quality\n"
+                "- Long holds: the strategy is exposed to longer-term regime shifts and gap risk\n"
+                "- Interpret it relative to the strategy type and volatility, never in isolation"
+            ),
+        ),
+        (
+            "Volatility",
+            (
+                "- The dispersion of period-to-period returns\n"
+                "- High volatility: wider swings, deeper potential drawdowns and greater uncertainty\n"
+                "- Low volatility: steadier equity growth with less stress\n"
+                "- Volatility is not good or bad by itself — weigh it against the returns it produces "
+                "and the ratio of return to volatility\n"
+                "- Consider whether volatility is consistent over time or clustered into specific episodes"
+            ),
+        ),
+        (
+            "Risk vs Return",
+            (
+                "- The central trade-off in evaluating any strategy\n"
+                "- Judge returns only against the risk required to earn them: drawdown depth, "
+                "volatility and risk-adjusted ratios\n"
+                "- A strategy is attractive only when the return justifies the risk borne\n"
+                "- Never present return figures without their risk context"
+            ),
+        ),
+        (
+            "Equity Curve",
+            (
+                "- Smooth growth: suggests a consistent edge, low stress and dependable compounding\n"
+                "- Volatile growth: strong overall results but uneven; monitor prolonged drawdown episodes\n"
+                "- Prolonged stagnation: the edge may be fading or the market regime may have shifted\n"
+                "- Sharp recoveries: indicative of resilience after drawdown, but check whether the "
+                "recovery relies on a few large winners\n"
+                "- Persistent decline: the edge may have broken or the regime is unsuitable; caution is warranted"
+            ),
+        ),
+    )
+
+    @staticmethod
+    def _render_metric_guide(name: str, guidance: str) -> str:
+        """Renders a single metric interpretation guide block.
+
+        Args:
+            name: Display name of the metric.
+            guidance: Qualitative interpretation guidance lines.
+
+        Returns:
+            A single formatted guide block.
+        """
+        return f"{name}\n{guidance}"
+
+    @classmethod
+    def _build_metric_guides(cls) -> str:
+        """Renders all registered metric interpretation guide blocks.
+
+        Returns:
+            Newline-joined blocks, one per registered metric.
+        """
+        blocks = [cls._render_metric_guide(name, guide)
+                  for name, guide in cls.METRIC_INTERPRETATION_GUIDES]
+        return "\n\n".join(blocks)
+
     def _build_quantitative_analysis_rules(self) -> str:
-        """Returns the reasoning principles for quantitative interpretation.
+        """Returns the reasoning principles and metric interpretation
+        guidance for quantitative analysis.
 
         Returns:
             Principles describing how the assistant should reason about
@@ -112,6 +275,13 @@ class PromptBuilder:
             "- Assess Sharpe ratio relative to volatility, not in isolation\n"
             "- Assess win rate relative to profitability, not in isolation\n"
             "- Assess trade count relative to statistical confidence, not in isolation\n"
+            "\n"
+            "Metric interpretation guidance:\n"
+            "\n"
+            f"{self._build_metric_guides()}\n"
+            "\n"
+            "Only interpret metrics that are actually present in the injected context. "
+            "If a metric is absent, ignore it and move on — never assume, require, or infer it.\n"
             "\n"
             "Never hardcode responses. Draw conclusions from the specific "
             "values present in the injected context."

@@ -97,6 +97,28 @@ This section supplies reasoning principles (not hardcoded answers) so the model 
 
 The model must never hardcode responses; conclusions must derive from the specific values in the injected context.
 
+### Metric Interpretation Guidance
+
+In addition to the relationship principles, the section teaches per-metric interpretation guidance. The guidance is held as a data registry — `PromptBuilder.METRIC_INTERPRETATION_GUIDES`, a tuple of `(name, guidance)` pairs rendered into the prompt. It currently covers:
+
+- Net Profit
+- Total Return
+- Maximum Drawdown
+- Sharpe Ratio
+- Sortino Ratio
+- Win Rate
+- Profit Factor
+- Trade Count
+- Average Trade
+- Average Hold Period
+- Volatility
+- Risk vs Return
+- Equity Curve
+
+Each guide is qualitative and threshold-free: for example, the Sharpe guide distinguishes high/moderate/low/negative levels, the drawdown guide distinguishes shallow/moderate/severe, the win-rate guide teaches that high win rate alone does not imply profitability, and the trade-count guide teaches that few trades mean lower statistical confidence while many trades can signal overtrading. The model is also told to interpret **only metrics present in the injected context** and to ignore absent ones.
+
+To add guidance for a new metric, append a `(name, guidance)` pair to `METRIC_INTERPRETATION_GUIDES` — no other changes are needed.
+
 ## Reasoning Framework
 
 Unless the user's question requires a different format, responses should follow this flow:
