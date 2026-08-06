@@ -21,6 +21,8 @@ stays easy to extend in future milestones.
 import copy
 from typing import Any, Dict, Optional
 
+from ai.mode import AnalysisMode
+
 
 class PromptBuilder:
     """Constructs prompt strings for LLM models by assembling system
@@ -713,17 +715,67 @@ class PromptBuilder:
 
     # ── Public API ──────────────────────────────────────────────
 
-    def build_prompt(self, context: Optional[Dict[str, Any]] = None) -> str:
-        """Assembles a complete prompt string from the seven logical
-        prompt sections: system identity, core behaviour rules,
-        quantitative analysis rules, reasoning framework, formatting
-        rules, injected context, and user question.
+    def build_prompt(
+        self,
+        context: Optional[Dict[str, Any]] = None,
+        mode: AnalysisMode = AnalysisMode.CHAT,
+    ) -> str:
+        """Assembles a complete prompt string for the requested analysis mode.
 
-        This is the primary entry point for prompt construction.
+        This is the primary entry point for prompt construction. It
+        dispatches by :class:`AnalysisMode` to the dedicated per-mode
+        builder, keeping the pipeline-mode control flow in one place.
 
         Args:
             context: A context dictionary produced by ContextBuilder v2.
                 May be None or empty; missing fields are handled gracefully.
+            mode: Analysis mode for the pipeline. Defaults to chat mode.
+
+        Returns:
+            Complete assembled prompt string ready for LLM inference.
+        """
+        builders = {
+            AnalysisMode.CHAT: self._build_chat_prompt,
+            AnalysisMode.REPORT: self._build_report_prompt,
+        }
+        return builders[mode](context)
+
+    # ── Mode Dispatch ───────────────────────────────────────────
+
+    def _build_chat_prompt(self, context: Optional[Dict[str, Any]]) -> str:
+        """Builds the interactive chat prompt.
+
+        Args:
+            context: A context dictionary produced by ContextBuilder v2.
+
+        Returns:
+            Complete assembled prompt string ready for LLM inference.
+        """
+        return self._build_shared_prompt(context)
+
+    def _build_report_prompt(self, context: Optional[Dict[str, Any]]) -> str:
+        """Builds the structured report prompt.
+
+        Args:
+            context: A context dictionary produced by ContextBuilder v2.
+
+        Returns:
+            Complete assembled prompt string ready for LLM inference.
+
+        Note:
+            Report-specific prompting will be implemented in a later
+            milestone; for now report mode reuses the shared template.
+        """
+        return self._build_shared_prompt(context)
+
+    def _build_shared_prompt(self, context: Optional[Dict[str, Any]]) -> str:
+        """Assembles the shared prompt template from the seven logical
+        prompt sections: system identity, core behaviour rules,
+        quantitative analysis rules, reasoning framework, formatting
+        rules, injected context, and user question.
+
+        Args:
+            context: A context dictionary produced by ContextBuilder v2.
 
         Returns:
             Complete assembled prompt string ready for LLM inference.
@@ -750,7 +802,12 @@ class PromptBuilder:
 
     # ── Legacy API ──────────────────────────────────────────────
 
-    def build(self, user_query: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def build(
+        self,
+        user_query: str,
+        context: Optional[Dict[str, Any]] = None,
+        mode: AnalysisMode = AnalysisMode.CHAT,
+    ) -> str:
         """Combines system prompt, context, and user query into a single prompt string.
 
         Note:
@@ -760,10 +817,11 @@ class PromptBuilder:
         Args:
             user_query: The raw query string submitted by the user.
             context: Optional context dictionary produced by ContextBuilder.
+            mode: Analysis mode for the pipeline. Defaults to chat mode.
 
         Returns:
             Complete assembled prompt string ready for LLM inference.
         """
         ctx = copy.deepcopy(context) if isinstance(context, dict) else {}
         ctx.setdefault("user", {})["message"] = user_query
-        return self.build_prompt(ctx)
+        return self.build_prompt(ctx, mode=mode)

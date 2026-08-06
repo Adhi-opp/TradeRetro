@@ -7,6 +7,8 @@ Pydantic models for AI Copilot request/response interface.
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+from ai.mode import AnalysisMode
+
 
 class Message(BaseModel):
     role: str = Field(..., description="Message sender role (e.g. user, assistant, system)")
@@ -26,6 +28,7 @@ class ChatResponse(BaseModel):
 class GenerateRequest(BaseModel):
     user_query: str = Field(..., description="User query text")
     provider_name: str = Field(default="qwen2.5-coder-1.5b-instruct", description="LLM provider identifier")
+    mode: AnalysisMode = Field(default=AnalysisMode.CHAT, description="Analysis mode for the pipeline")
     market_data: Optional[dict] = Field(default=None, description="Market context data")
     strategy_data: Optional[dict] = Field(default=None, description="Strategy context data")
     backtest_data: Optional[dict] = Field(default=None, description="Backtest context data")

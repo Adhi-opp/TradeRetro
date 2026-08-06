@@ -44,6 +44,7 @@ async def generate(body: GenerateRequest) -> GenerateResponse:
     result = await run_in_threadpool(
         ai_service.generate_response,
         user_query=body.user_query,
+        mode=body.mode,
         provider_name=body.provider_name,
         market_data=body.market_data,
         strategy_data=body.strategy_data,

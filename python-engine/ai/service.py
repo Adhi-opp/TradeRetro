@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 
 from ai.config import AIConfig
 from ai.context_builder import ContextBuilder
+from ai.mode import AnalysisMode
 from ai.provider_factory import AIProviderFactory
 from ai.prompt_builder import PromptBuilder
 
@@ -44,6 +45,7 @@ class AIService:
     def generate_response(
         self,
         user_query: str,
+        mode: AnalysisMode = AnalysisMode.CHAT,
         provider_name: Optional[str] = None,
         market_data: Optional[Dict[str, Any]] = None,
         strategy_data: Optional[Dict[str, Any]] = None,
@@ -55,6 +57,7 @@ class AIService:
 
         Args:
             user_query: Raw user query string.
+            mode: Analysis mode for the pipeline. Defaults to chat mode.
             provider_name: Model or provider identifier. Falls back to
                 ``config.model`` if not provided.
             market_data: Optional market context input data.
@@ -78,7 +81,7 @@ class AIService:
                 portfolio_data=portfolio_data,
             )
 
-            prompt = self.prompt_builder.build(user_query=user_query, context=context)
+            prompt = self.prompt_builder.build(user_query=user_query, context=context, mode=mode)
             logger.info(
                 "Selected provider/model=%s | Prompt built (%d chars)",
                 provider_name, len(prompt),
