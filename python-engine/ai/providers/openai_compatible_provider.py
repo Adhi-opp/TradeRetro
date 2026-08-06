@@ -27,11 +27,27 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         base_url: str = DEFAULT_BASE_URL,
         api_key: str = "not-needed",
         timeout_seconds: int = DEFAULT_TIMEOUT,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> None:
+        """Initializes the provider.
+
+        Args:
+            model: Model identifier sent in the request.
+            base_url: Base URL of the OpenAI-compatible server.
+            api_key: Optional bearer token for authentication.
+            timeout_seconds: Request timeout in seconds.
+            temperature: Sampling temperature. ``None`` (default) omits the
+                field and lets the server apply its own default.
+            max_tokens: Maximum tokens in the response. ``None`` (default)
+                omits the field and lets the server apply its own default.
+        """
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout_seconds
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
     def generate_response(self, prompt: str) -> str:
         url = f"{self.base_url}/v1/chat/completions"
@@ -48,6 +64,10 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             ],
             "stream": False,
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
+        if self.max_tokens is not None:
+            payload["max_tokens"] = self.max_tokens
 
         try:
             with httpx.Client(timeout=self.timeout) as client:

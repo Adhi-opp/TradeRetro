@@ -26,6 +26,8 @@ class OllamaProvider(BaseLLMProvider):
         model: str = "llama3.2",
         base_url: str = DEFAULT_BASE_URL,
         timeout_seconds: int = DEFAULT_TIMEOUT,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ) -> None:
         """Initializes the OllamaProvider.
 
@@ -33,10 +35,16 @@ class OllamaProvider(BaseLLMProvider):
             model: The Ollama model name to use (default ``"llama3.2"``).
             base_url: Base URL of the Ollama HTTP API.
             timeout_seconds: Request timeout in seconds.
+            temperature: Sampling temperature forwarded via ``options``.
+                ``None`` (default) omits the option.
+            max_tokens: Maximum tokens forwarded via ``options.num_predict``.
+                ``None`` (default) omits the option.
         """
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout_seconds
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
     def generate_response(self, prompt: str) -> str:
         """Generates a response via the local Ollama API.
@@ -53,6 +61,13 @@ class OllamaProvider(BaseLLMProvider):
             "prompt": prompt,
             "stream": False,
         }
+        options = {}
+        if self.temperature is not None:
+            options["temperature"] = self.temperature
+        if self.max_tokens is not None:
+            options["num_predict"] = self.max_tokens
+        if options:
+            payload["options"] = options
 
         try:
             with httpx.Client(timeout=self.timeout) as client:

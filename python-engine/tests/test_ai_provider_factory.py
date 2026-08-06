@@ -153,9 +153,38 @@ class TestOpenAICompatibleWiring:
         provider = factory.get_provider("openai-compatible")
         assert provider.base_url == "http://host:9999"
 
+    def test_wiring_propagates_temperature_and_max_tokens(self):
+        config = AIConfig(temperature=0.7, max_tokens=512)
+        factory = AIProviderFactory(config=config)
+        provider = factory.get_provider("qwen2.5-coder-1.5b-instruct")
+        assert isinstance(provider, OpenAICompatibleProvider)
+        assert provider.temperature == 0.7
+        assert provider.max_tokens == 512
+
     def test_all_providers_subclass_base(self, factory):
         for name in ("mock", "ollama", "gemini", "openai", "openai-compatible"):
             assert isinstance(factory.get_provider(name), BaseLLMProvider), name
+
+
+# ── Configuration wiring ──────────────────────────────────────────────────────
+
+
+class TestConfigWiring:
+    def test_ollama_wires_model_temperature_and_max_tokens(self):
+        config = AIConfig(temperature=0.3, max_tokens=256)
+        factory = AIProviderFactory(config=config)
+        provider = factory.get_provider("mistral")
+        assert isinstance(provider, OllamaProvider)
+        assert provider.model == "mistral"
+        assert provider.temperature == 0.3
+        assert provider.max_tokens == 256
+
+    def test_ollama_provider_name_uses_registered_default(self, factory):
+        provider = factory.get_provider("ollama")
+        assert isinstance(provider, OllamaProvider)
+        assert provider.model == "llama3.2"
+        assert provider.temperature == factory._config.temperature
+        assert provider.max_tokens == factory._config.max_tokens
 
 
 # ── Legacy factory ───────────────────────────────────────────────────────────

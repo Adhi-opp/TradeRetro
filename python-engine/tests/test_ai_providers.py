@@ -93,8 +93,8 @@ def _openai_compatible(model="qwen2.5-coder-7b-instruct", **kwargs) -> OpenAICom
     return OpenAICompatibleProvider(model=model, **kwargs)
 
 
-def _ollama(model="llama3.2") -> OllamaProvider:
-    return OllamaProvider(model=model)
+def _ollama(model="llama3.2", **kwargs) -> OllamaProvider:
+    return OllamaProvider(model=model, **kwargs)
 
 
 def _success_payload():
@@ -162,6 +162,24 @@ class TestOpenAICompatibleProvider:
         assert client.last_json["messages"] == [{"role": "user", "content": "the user prompt"}]
         assert client.last_json["model"] == "qwen2.5-coder-7b-instruct"
         assert client.last_json["stream"] is False
+
+    def test_temperature_and_max_tokens_sent_when_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _success_payload())
+        provider = _openai_compatible(temperature=0.2, max_tokens=1024)
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert client.last_json["temperature"] == 0.2
+        assert client.last_json["max_tokens"] == 1024
+
+    def test_generation_params_omitted_when_not_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _success_payload())
+        provider = _openai_compatible()
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert "temperature" not in client.last_json
+        assert "max_tokens" not in client.last_json
 
     def test_authorization_header_when_api_key(self):
         client = _RecordingClient()
@@ -270,6 +288,22 @@ class TestOllamaProvider:
             provider.generate_response("hi")
         assert client.last_url == OLLAMA_URL
         assert client.last_json == {"model": "mistral", "prompt": "hi", "stream": False}
+
+    def test_generation_options_sent_when_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, {"response": "ok"})
+        provider = _ollama(model="mistral", temperature=0.2, max_tokens=1024)
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert client.last_json["options"] == {"temperature": 0.2, "num_predict": 1024}
+
+    def test_generation_options_omitted_when_not_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, {"response": "ok"})
+        provider = _ollama()
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert "options" not in client.last_json
 
     def test_404_returns_pull_hint(self):
         client = _RecordingClient()

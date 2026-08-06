@@ -11,13 +11,10 @@ from dataclasses import dataclass
 class AIConfig:
     """Dataclass holding configuration parameters for AI Copilot."""
 
-    enabled: bool = True
-    provider: str = "openai-compatible"
     model: str = "qwen2.5-coder-1.5b-instruct"
     temperature: float = 0.2
     max_tokens: int = 1024
-    timeout_seconds: int = 30
-    debug: bool = False
+    timeout_seconds: int = 30  # reserved; providers use their own internal timeouts
     openai_compatible_base_url: str = "http://localhost:1234"
     openai_compatible_api_key: str = "not-needed"
 
@@ -40,14 +37,6 @@ class AIConfigurationManager:
             Current AIConfig object.
         """
         return self._config
-
-    def set_provider(self, provider_name: str) -> None:
-        """Sets the active LLM provider name.
-
-        Args:
-            provider_name: Target provider identifier string.
-        """
-        self._config.provider = provider_name
 
     def set_temperature(self, value: float) -> None:
         """Sets the sampling temperature for LLM generation.

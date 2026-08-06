@@ -83,6 +83,17 @@ class AIProviderFactory:
                 model=resolved_model_id or self._config.model,
                 base_url=self._config.openai_compatible_base_url,
                 api_key=self._config.openai_compatible_api_key,
+                temperature=self._config.temperature,
+                max_tokens=self._config.max_tokens,
             )
+
+        if provider_type == "ollama":
+            kwargs = {
+                "temperature": self._config.temperature,
+                "max_tokens": self._config.max_tokens,
+            }
+            if resolved_model_id:
+                kwargs["model"] = resolved_model_id
+            return cls(**kwargs)
 
         return cls()
