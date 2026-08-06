@@ -1,7 +1,0 @@
-INFO:     Started server process [4348]
-INFO:     Waiting for application startup.
-2026-07-26 07:30:01,508 traderetro.scheduler INFO EOD scheduler started — target: 16:00 IST on weekdays
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-2026-07-26 07:30:16,696 traderetro.scheduler INFO Catch-up check: warehouse empty — leaving backfill to the user
-2026-07-26 07:30:16,699 traderetro.scheduler INFO Next EOD run at Mon 2026-07-27 16:00 IST (32.5h away)
