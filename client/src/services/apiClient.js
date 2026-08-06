@@ -2,9 +2,11 @@
  * Shared HTTP client for TradeRetro frontend services.
  *
  * This module is intentionally framework-light and uses the browser Fetch API.
- * Existing components are not wired to this client yet; it is the foundation
- * for future API consolidation without changing current request/response
- * contracts.
+ * All services (aiService, aiContextBuilder, backtestService, marketService,
+ * pipelineService) route requests through this client. The AI Copilot services
+ * are consumed by the UI today; the domain services are the consolidation
+ * foundation and are not yet wired into existing components, so current
+ * request/response contracts remain unchanged.
  */
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';

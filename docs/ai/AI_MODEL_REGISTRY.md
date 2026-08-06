@@ -15,7 +15,7 @@ Each model is represented by a `ModelInfo` dataclass:
 
 ## Statically Registered Models
 
-The static registry (`REGISTERED_MODELS`) contains 14 entries:
+The static registry (`REGISTERED_MODELS`) contains 13 entries:
 
 ### Mock
 

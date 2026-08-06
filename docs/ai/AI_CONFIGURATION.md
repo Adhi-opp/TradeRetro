@@ -11,9 +11,9 @@ Configuration for the AI Copilot is entirely self-contained within `python-engin
 | `enabled` | `bool` | `True` | Master toggle for the AI Copilot |
 | `provider` | `str` | `"openai-compatible"` | Default provider backend identifier |
 | `model` | `str` | `"qwen2.5-coder-1.5b-instruct"` | Default model ID sent to the provider |
-| `temperature` | `float` | `0.2` | LLM sampling temperature (0.0–2.0) |
-| `max_tokens` | `int` | `1024` | Maximum tokens in the generated response |
-| `timeout_seconds` | `int` | `30` | HTTP request timeout for providers |
+| `temperature` | `float` | `0.2` | LLM sampling temperature (0.0–2.0); configured default, not yet delivered to providers |
+| `max_tokens` | `int` | `1024` | Maximum tokens in the generated response; configured default, not yet delivered to providers |
+| `timeout_seconds` | `int` | `30` | Reserved; providers use their own internal timeouts (see below) |
 | `debug` | `bool` | `False` | Enable debug-level logging |
 | `openai_compatible_base_url` | `str` | `"http://localhost:1234"` | Base URL for openai-compatible provider |
 | `openai_compatible_api_key` | `str` | `"not-needed"` | API key for openai-compatible provider |
@@ -72,8 +72,17 @@ The trade-off is that changing settings (e.g., pointing to a different LM Studio
 
 ### Why separate timeout values?
 
-`AIConfig.timeout_seconds` (30s) is the general default. `OpenAICompatibleProvider` uses a 120s timeout because local LLMs on consumer hardware can be slow, especially for longer generations. `OllamaProvider` uses 60s. These are internal defaults in the provider classes, not in `AIConfig`.
+`AIConfig.timeout_seconds` (30s) is currently **reserved** — no provider reads it.
+`OpenAICompatibleProvider` uses a 120s timeout because local LLMs on consumer
+hardware can be slow, especially for longer generations. `OllamaProvider` uses
+60s. These are internal defaults in the provider classes, not in `AIConfig`.
+
+Similarly, `AIConfig.temperature` (0.2) and `AIConfig.max_tokens` (1024) are
+**configured defaults but are not yet delivered to any provider** — provider
+payloads send only `model`, `messages`, and `stream`. Wiring these values
+through the provider interface is planned work; until then they serve as the
+documented project defaults.
 
 ### What's Next
 
-See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for planned configuration improvements including environment variable overrides, YAML/JSON config files, per-provider profiles, and a runtime configuration API.
+See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for planned configuration improvements including environment variable overrides, per-provider configuration profiles, and a runtime configuration API.

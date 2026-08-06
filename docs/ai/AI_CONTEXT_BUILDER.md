@@ -114,10 +114,14 @@ After assembling all domains, the builder appends a metadata block:
 {
     "generated_at": "2026-07-25T03:00:00.000000+00:00",  # UTC ISO 8601
     "total_domains": 6,      # Always 6 (user + 5 domain envelopes)
-    "populated_domains": 3,  # Count of domains with data available
-    "domains_with_data": ["user", "market", "metrics"],  # Names of populated domains
+    "populated_domains": 2,  # Count of envelope domains with data available
+    "domains_with_data": ["market", "metrics"],  # Populated envelope domain names
 }
 ```
+
+The `user` domain is not an envelope domain and is therefore **excluded** from
+`populated_domains` and `domains_with_data` — those counts describe only the five
+data domains (market, strategy, backtest, metrics, portfolio).
 
 The metadata is useful for:
 - Logging/debugging what data was provided
@@ -149,8 +153,8 @@ ContextBuilder.build(
     "metadata": {
         "generated_at": "2026-07-25T03:00:00+00:00",
         "total_domains": 6,
-        "populated_domains": 3,
-        "domains_with_data": ["user", "market", "metrics"]
+        "populated_domains": 2,
+        "domains_with_data": ["market", "metrics"]
     }
 }
          │

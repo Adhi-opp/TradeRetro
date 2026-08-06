@@ -2,8 +2,11 @@
 
 This folder contains the frontend service layer for TradeRetro.
 
-The services are intentionally not wired into existing components yet. Current
-component imports and request/response contracts remain unchanged.
+The AI services (`aiService.js`, `aiContextBuilder.js`) are actively consumed by
+the AI Copilot through `useAIStore`. The domain services (backtest, market,
+pipeline) are the consolidation foundation and are not wired into existing
+components yet; current component imports and request/response contracts remain
+unchanged.
 
 ## Organization
 
@@ -13,6 +16,19 @@ component imports and request/response contracts remain unchanged.
   - Exposes `GET`, `POST`, `PUT`, and `DELETE`.
   - Handles timeouts, JSON parsing, normalized errors, headers, future auth,
     and future websocket URL compatibility.
+
+- `aiService.js`
+  - AI Copilot generation endpoint.
+  - `generate(userQuery, providerName, contextPayload)` calls
+    `POST /api/ai/generate` through `apiClient`.
+  - Consumed by `useAIStore.sendMessage()`.
+
+- `aiContextBuilder.js`
+  - Pure, side-effect-free context builder (no React, no network).
+  - `buildAiContext(state)` normalizes `useBacktestStore` state (strategy,
+    market, backtest, metrics) into an AI request payload.
+  - Only includes sections with actual data — never sends empty objects.
+  - Extensible via a builder registry (`BUILDERS`).
 
 - `backtestService.js`
   - Backtest domain endpoints.

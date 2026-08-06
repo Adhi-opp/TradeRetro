@@ -1,10 +1,19 @@
 # AI Testing Guide
 
-## Test Report — v1.0.0
+## Test Report — v1.1.0
 
-The AI module has **no dedicated automated test suite** as of v1.0.0. The existing `test_routers.py` covers health, backtest, and ingestion endpoints but does not include any `/api/ai/*` tests. All AI module testing has been performed manually against the live FastAPI server.
+The AI module has a dedicated automated test suite. The full backend suite stands at **279 tests**, of which **169 cover the AI module** across six files:
 
-This document serves as both a manual testing reference and a specification for future automated tests.
+| File | Scope |
+|---|---|
+| `test_ai_router.py` | `/api/ai/*` endpoint contract: health, models, generate, validation (400 `VALIDATION_ERROR`), unknown-provider failure path |
+| `test_ai_service.py` | `AIService` orchestration: success/error payload shapes, exception containment, provider selection, context propagation |
+| `test_ai_context_builder.py` | 6-domain context assembly, envelope schema, metadata, user domain behaviour, legacy `build()` wrapper |
+| `test_ai_prompt_builder.py` | 7-section prompt structure, ordering, determinism, reasoning registries, legacy `build()` wrapper |
+| `test_ai_providers.py` | Mock, OpenAI-compatible, and Ollama providers plus OpenAI/Gemini stubs, including all error paths |
+| `test_ai_provider_factory.py` | Provider resolution, registry fallback, openai-compatible wiring, legacy `LLMProviderFactory` |
+
+This document also serves as a manual testing reference for live provider verification.
 
 ## Environment
 
@@ -174,11 +183,13 @@ curl -X POST http://localhost:8000/api/ai/generate \
   -d '{}'
 ```
 
-**Expected response (HTTP 422):**
+**Expected response (HTTP 400 with `VALIDATION_ERROR`):**
 
 ```json
 {
-    "detail": [
+    "error": "VALIDATION_ERROR",
+    "message": "Invalid request payload",
+    "details": [
         {
             "type": "missing",
             "loc": ["body", "user_query"],
@@ -188,6 +199,8 @@ curl -X POST http://localhost:8000/api/ai/generate \
     ]
 }
 ```
+
+The same `400 VALIDATION_ERROR` contract applies to malformed JSON and wrong field types (see `test_ai_router.py::TestGenerateValidation`).
 
 ## LM Studio Verification
 
@@ -255,71 +268,34 @@ Both return:
 }
 ```
 
-## Unit Test Template
+## Automated Test Strategy
 
-When writing automated tests, the following structure is recommended (uses `pytest` with `httpx`'s `TestClient`):
+The AI suite is organized by module layer so a failure pinpoints the responsible component:
 
-```python
-import pytest
-from fastapi.testclient import TestClient
-from main import app
+- **Router tests** boot the full FastAPI app with DB/Redis stubbed and Ollama discovery patched offline. They verify the HTTP contract, including the `400 VALIDATION_ERROR` body shape, response schema stability, and the unknown-provider `success: false` path.
+- **Service tests** inject a deterministic fake factory/provider to verify orchestration: payload shapes, strict exception containment (no uncaught exceptions escape to the API), JSON parsing fallback (`{"raw_response": ...}`), and provider/query passthrough.
+- **Context builder tests** verify the envelope schema stability, the user domain's non-envelope contract, metadata, and the legacy `build()` wrapper.
+- **Prompt builder tests** verify the exact 7-section structure, heading order and ruling, byte-identical determinism, and that all three reasoning registries are rendered.
+- **Provider tests** mock `httpx` to cover success and every documented error path (404, connect error, timeout, empty content, missing choices) for mock, openai-compatible, and Ollama.
+- **Provider factory tests** cover resolution via registry, provider-name fallback, case-insensitivity, openai-compatible `AIConfig` wiring, and error-message content.
 
-client = TestClient(app)
+## Running Tests
 
+To run the full backend suite (279 tests):
 
-class TestAIHealth:
-    def test_health_returns_module_and_status(self):
-        resp = client.get("/api/ai/health")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["module"] == "ai"
-        assert data["status"] == "initialized"
-
-
-class TestAIModels:
-    def test_models_returns_list(self):
-        resp = client.get("/api/ai/models")
-        assert resp.status_code == 200
-        models = resp.json()
-        assert isinstance(models, list)
-        assert any(m["id"] == "mock" for m in models)
-
-
-class TestAIGenerate:
-    def test_generate_with_mock_provider(self):
-        resp = client.post("/api/ai/generate", json={
-            "user_query": "test query",
-            "provider_name": "mock",
-        })
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["success"] is True
-        assert data["provider"] == "mock"
-        assert data["response"]["response"] == "Mock response generated successfully."
-
-    def test_generate_missing_user_query(self):
-        resp = client.post("/api/ai/generate", json={})
-        assert resp.status_code == 422
-
-    def test_generate_invalid_provider(self):
-        resp = client.post("/api/ai/generate", json={
-            "user_query": "test",
-            "provider_name": "invalid",
-        })
-        assert resp.status_code == 200
-        assert resp.json()["success"] is False
-
-    def test_generate_with_context_data(self):
-        resp = client.post("/api/ai/generate", json={
-            "user_query": "What is the Sharpe?",
-            "provider_name": "mock",
-            "metrics_data": {"sharpe_ratio": 1.5},
-        })
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["context"]["metrics"]["available"] is True
-        assert data["context"]["metrics"]["data"]["sharpe_ratio"] == 1.5
+```bash
+cd python-engine
+pytest tests/ -v
 ```
+
+To run only the AI suite (169 tests):
+
+```bash
+cd python-engine
+pytest tests/test_ai_*.py -v
+```
+
+Router tests stub `services.db` and `services.redis_client` and patch Ollama discovery offline, so no infrastructure or network access is required.
 
 ## Known Expected Outputs
 
@@ -328,14 +304,3 @@ class TestAIGenerate:
 | Mock generate | any prompt | `"Mock response generated successfully."` |
 | OpenAI stub | any prompt | `None` (with `success: false`) |
 | Gemini stub | any prompt | `None` (with `success: false`) |
-
-## Running Tests
-
-Currently, no AI-specific tests exist. To run the existing test suite:
-
-```bash
-cd python-engine
-pytest tests/ -v
-```
-
-The existing tests stub out `services.db` and `services.redis_client` to run without infrastructure. AI tests would not require those stubs since the AI module has no external infrastructure dependencies (other than the optional LLM backend).

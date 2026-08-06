@@ -238,10 +238,11 @@ Three techniques are used:
 
 ## Temperature Selection
 
-`temperature = 0.2` (low) is the default:
+`temperature = 0.2` (low) is the configured default:
 
 - **Why low?** Trading analysis requires precision, consistency, and factual accuracy — not creative writing. Low temperature reduces the probability of hallucination and produces more deterministic outputs.
 - **Range allowed:** 0.0–2.0, validated by `AIConfigurationManager.set_temperature()`.
+- **Note:** the value is currently reserved — provider payloads do not yet include it (see [AI_CONFIGURATION.md](AI_CONFIGURATION.md)). It remains the documented project default for when wiring lands.
 
 ## Prompt Flow
 
@@ -295,6 +296,11 @@ Three techniques are used:
 ```
 
 ## Example Generated Prompt
+
+For brevity, the example below elides the full guide registries rendered inside
+the QUANTITATIVE ANALYSIS RULES section (13 metric interpretation guides,
+11 cross-metric combination guides, and 11 strategy-family profiles) and shows
+only the framing text. The structure, rulings, and section order are exact.
 
 ```text
 ============================================================

@@ -12,7 +12,7 @@ The following limitations apply to the current implementation. These are known c
 | **No Conversation Memory** | Each `/api/ai/generate` request is stateless. The model has no access to previous queries or responses within a session. Context must be provided with every request. |
 | **No RAG (Retrieval-Augmented Generation)** | The system cannot retrieve documents or knowledge base entries to augment prompts. All context must be explicitly provided in the request body. |
 | **No Vector Database** | No embeddings, vector storage, or semantic search. All context is structured data passed directly in API calls. |
-| **No Agents** | There are no autonomous agents, multi-step reasoning loops, or tool-use capabilities. The system is a single-turn Q&A interface. |
+| **No Agents** | There are no autonomous agents, multi-step reasoning loops, or tool-use capabilities. Each backend request is answered independently; the chat thread is held client-side and is not seen by the model. |
 | **No Tool Calling / Function Calling** | The LLM cannot call external functions, query databases, or trigger backend operations. It can only respond based on the prompt it receives. |
 
 ## Provider Limitations
@@ -45,7 +45,7 @@ The following limitations apply to the current implementation. These are known c
 | Limitation | Description |
 |---|---|
 | **Prompt Templates Are Placeholders** | The `.md` files in `ai/prompts/` contain only header comments. They are not loaded or used by the current codebase. The only active prompt is the hardcoded system prompt in `PromptBuilder`. |
-| **Context Is Fully Static** | Context data is passed snapshot-style. There is no live data fetching or automatic context enrichment from the backend database or market data services. |
+| **Context Is Per-Request** | Context is passed snapshot-style with each request. The frontend injects live backtest state automatically, but there is no server-side enrichment — no live data fetching or automatic context lookup from the backend database or market data services. |
 | **No Output Validation** | The LLM response is not validated against any schema or expected format. If the model produces an unexpected response, it is returned as-is. |
 | **JSON Parsing Fallback** | If the provider returns non-JSON output, it is wrapped in `{"raw_response": "..."}`. No structured error or retry is attempted. |
 
@@ -53,7 +53,9 @@ The following limitations apply to the current implementation. These are known c
 
 | Limitation | Description |
 |---|---|
-| **No Frontend Integration** | The `/api/ai/*` endpoints are mounted and functional, but the React client does not reference or consume any AI endpoint. There is no chat UI, no settings panel, and no AI feature surfaced to users. |
+| **No Model Selection UI** | Copilot requests use the server default model (`qwen2.5-coder-1.5b-instruct`). The settings button in the Copilot header is present but disabled — there is no model dropdown or provider picker yet. |
+| **In-Memory Conversation Only** | The conversation is held in the client-side Zustand store and is lost on page reload. There is no persistence and no server-side conversation memory. |
+| **Quick Actions Disabled** | The quick-action cards in the Copilot panel are visual placeholders and are not yet wired to send prompts. |
 
 ## Security Limitations
 

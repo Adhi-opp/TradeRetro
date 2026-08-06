@@ -45,9 +45,9 @@ Houses `AIConfig` (a plain `@dataclass`) and `AIConfigurationManager` for valida
 | `enabled` | `True` | Master toggle |
 | `provider` | `"openai-compatible"` | Default backend |
 | `model` | `"qwen2.5-coder-1.5b-instruct"` | Default model ID |
-| `temperature` | `0.2` | Sampler temperature |
-| `max_tokens` | `1024` | Max response tokens |
-| `timeout_seconds` | `30` | HTTP timeout |
+| `temperature` | `0.2` | Sampler temperature (configured default; not currently passed to providers) |
+| `max_tokens` | `1024` | Max response tokens (configured default; not currently passed to providers) |
+| `timeout_seconds` | `30` | Reserved; providers use their own internal timeouts (`OpenAICompatibleProvider` 120s, `OllamaProvider` 60s) |
 | `debug` | `False` | Debug logging |
 | `openai_compatible_base_url` | `"http://localhost:1234"` | LM Studio default |
 | `openai_compatible_api_key` | `"not-needed"` | Local servers rarely need auth |
@@ -173,7 +173,7 @@ This is a closed set by design — the supported providers are known at compile 
 
 Maintains the model catalog. Each entry is a `ModelInfo` dataclass: `id`, `display_name`, `provider`, `local: bool`.
 
-The static dict `REGISTERED_MODELS` holds 14 entries spanning mock, Ollama, Gemini, OpenAI, and openai-compatible providers. At query time, `discover_ollama_models()` pings `http://localhost:11434/api/tags` and merges any locally installed Ollama models into the registry (existing entries are not overwritten). If Ollama isn't reachable, it logs a debug message and returns only the static set — no exception propagates.
+The static dict `REGISTERED_MODELS` holds 13 entries spanning mock, Ollama, Gemini, OpenAI, and openai-compatible providers. At query time, `discover_ollama_models()` pings `http://localhost:11434/api/tags` and merges any locally installed Ollama models into the registry (existing entries are not overwritten). If Ollama isn't reachable, it logs a debug message and returns only the static set — no exception propagates.
 
 Two public functions:
 

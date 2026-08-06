@@ -1,14 +1,25 @@
 # AI Future Roadmap
 
-This document describes planned improvements to the AI module. Items are organized by time horizon. None of these features are implemented yet.
+This document describes completed milestones and planned improvements to the AI module. Items are organized by time horizon. Features listed under "Completed" are implemented; everything else is future work.
+
+## Completed (Tasks 02A–04B)
+
+### Frontend Integration
+- ✅ Copilot chat panel added to the React UI (`client/src/components/copilot/`)
+- ✅ Chat panel wired to `POST /api/ai/generate` via `aiService.js`
+- ✅ Markdown-rendered responses in the chat UI (`react-markdown` + `remark-gfm`)
+- ✅ Automatic context injection — live backtest state is attached to every Copilot request via `aiContextBuilder.js`
+
+### Automated Tests
+- ✅ Comprehensive AI test suite: 169 AI tests across the router, service, context builder, prompt builder, providers, and provider factory (279 tests in the full suite)
+- ✅ Coverage for error paths (connection refused, timeout, unknown provider, validation errors)
 
 ## Short-Term (Next 1–2 Milestones)
 
-### Frontend Integration
-- Add a Copilot chat panel to the React UI
-- Wire the chat panel to `POST /api/ai/generate`
-- Display markdown-rendered responses in the chat UI
-- Add model selection dropdown populated from `GET /api/ai/models`
+### Model Selection UI
+- Add a model dropdown to the Copilot panel populated from `GET /api/ai/models`
+- Enable the currently disabled settings button to pick provider/model
+- Allow the selected model to be sent via `provider_name` on generate requests
 
 ### Streaming Support
 - Implement Server-Sent Events (SSE) for token-by-token streaming
@@ -20,10 +31,9 @@ This document describes planned improvements to the AI module. Items are organiz
 - Example: `AI_PROVIDER`, `AI_MODEL`, `AI_TEMPERATURE`, `AI_BASE_URL`
 - Fall back to hardcoded defaults if env vars are not set
 
-### Automated Tests
-- Write unit tests for `ContextBuilder`, `PromptBuilder`, `AIProviderFactory`
-- Write integration tests using the Mock provider
-- Add test coverage for error paths (connection refused, timeout, invalid provider)
+### Enable Quick Actions
+- Wire the visual quick-action cards to send prebuilt prompts
+- Add example prompts as clickable suggestions in the empty state
 
 ## Medium-Term (Next 3–5 Milestones)
 

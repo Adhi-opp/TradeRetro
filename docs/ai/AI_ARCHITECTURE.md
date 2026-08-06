@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI Copilot follows a layered architecture with clear separation of concerns: a FastAPI router receives HTTP requests, an orchestration service coordinates context assembly and prompt construction, a provider factory resolves the correct LLM backend, and concrete provider implementations communicate with external model servers.
+The AI Copilot follows a layered architecture with clear separation of concerns: a React Copilot panel in the client consumes the API, a FastAPI router receives HTTP requests, an orchestration service coordinates context assembly and prompt construction, a provider factory resolves the correct LLM backend, and concrete provider implementations communicate with external model servers.
 
 ## Design Philosophy
 
@@ -18,6 +18,11 @@ The same principle applies to the provider abstraction. The service layer never 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        PRESENTATION LAYER                           │
 │                                                                     │
+│  React Copilot Panel (client/src/components/copilot/)               │
+│  - useAIStore + aiService.js + aiContextBuilder.js                  │
+│  - Injects live backtest state as request context                   │
+│          │                                                          │
+│          ▼                                                          │
 │  FastAPI Router (ai/router.py)                                      │
 │  Prefix: /api/ai                                                    │
 │  Endpoints: GET /health, GET /models, POST /generate                │
@@ -43,13 +48,15 @@ The same principle applies to the provider abstraction. The service layer never 
 │ (ai/context  │    │ (ai/prompt     │    │ (ai/provider_factory │
 │  _builder.py)│    │  _builder.py)  │    │  .py)                │
 │              │    │                │    │                      │
-│ 6 domains:   │    │ System Instr.  │    │ Registry lookup      │
-│ • user       │    │ + Context      │    │ → provider type      │
-│ • market     │    │ + Output Rules │    │ → instantiate class  │
-│ • strategy   │    │ + User Query   │    │                      │
-│ • backtest   │    │                │    │                      │
-│ • metrics    │    │                │    │                      │
-│ • portfolio  │    │                │    │                      │
+│ 6 domains:   │    │ 7 sections:    │    │ Registry lookup      │
+│ • user       │    │ 1 System       │    │ → provider type      │
+│ • market     │    │   Identity     │    │ → instantiate class  │
+│ • strategy   │    │ 2 Core Rules   │    │                      │
+│ • backtest   │    │ 3 Quant Rules  │    │                      │
+│ • metrics    │    │ 4 Reasoning    │    │                      │
+│ • portfolio  │    │ 5 Formatting   │    │                      │
+│              │    │ 6 Context Data │    │                      │
+│              │    │ 7 User Question│    │                      │
 └──────────────┘    └────────────────┘    └──────────┬───────────┘
                                                      │
                                                      ▼
@@ -84,7 +91,7 @@ All dependencies are injected via the constructor and default to fresh instances
 
 ### 4. Prompt Construction — `ai/prompt_builder.py`
 
-`PromptBuilder` assembles seven sections delimited by `=` rulers: system identity (persona + specialization), core behaviour rules (integrity constraints), quantitative analysis rules (metric interpretation principles), reasoning framework, formatting rules (markdown/citations/no speculation), context data (rendered domain blocks), and the user's question. Each section is built by a dedicated private helper and wrapped by a shared `_section(title, body)` method. Safety rules prohibit fabrication, hallucination, price prediction, and trade recommendations. The older `build()` method injects the user query into context for callers that haven't migrated to `build_prompt()`.
+`PromptBuilder` assembles seven sections delimited by `=` rulers: system identity (persona + specialization), core behaviour rules (integrity constraints), quantitative analysis rules (metric interpretation principles plus the `METRIC_INTERPRETATION_GUIDES`, `CROSS_METRIC_REASONING_GUIDES`, and `STRATEGY_REASONING_GUIDES` registries), reasoning framework, formatting rules (markdown/citations/no speculation), context data (rendered domain blocks), and the user's question. Each section is built by a dedicated private helper and wrapped by a shared `_section(title, body)` method. Safety rules prohibit fabrication, hallucination, price prediction, and trade recommendations. The older `build()` method injects the user query into context for callers that haven't migrated to `build_prompt()`.
 
 ### 5. Provider Factory — `ai/provider_factory.py`
 
@@ -92,7 +99,7 @@ All dependencies are injected via the constructor and default to fresh instances
 
 ### 6. Provider Layer — `ai/providers/`
 
-Every provider extends `BaseLLMProvider` and implements `generate_response(prompt) -> str`. All return JSON strings with `provider`, `model`, `success`, `response`, `error`, and `tokens_used`. Common error paths covered: `ConnectError` (server down), `TimeoutException`, 404 (model not loaded), and empty responses.
+Every provider extends `BaseLLMProvider` and implements `generate_response(prompt) -> str`. All return JSON strings with `provider` and `success`; success responses carry `response` (plus `model` and `tokens_used` where the provider tracks them), and failures carry `error`. Common error paths covered: `ConnectError` (server down), `TimeoutException`, 404 (model not loaded), and empty responses.
 
 ## Request Lifecycle
 
@@ -171,6 +178,6 @@ ai/llm_provider.py (legacy)
 | **Context domains as envelopes** | Every domain carries an `available` flag and `source`. The prompt builder can check availability without knowing the data shape — no conditional branching in the orchestration layer. |
 | **JSON responses from providers** | Self-describing responses (`success`, `error`, `tokens_used`) mean the service layer can parse and forward without guessing whether the call succeeded. |
 | **Separate builders** | Context assembly and prompt construction are independent concerns. Splitting them makes each testable in isolation and allows swapping prompt strategies without touching data collection. |
-| **Low temperature (0.2)** | Trading analysis needs precision, not creativity. A lower temperature reduces hallucinations and produces more deterministic outputs. |
+| **Low temperature (0.2)** | Trading analysis needs precision, not creativity. A lower temperature reduces hallucinations and produces more deterministic outputs. Note: this is the configured default — it is not yet delivered to provider payloads (see [AI_CONFIGURATION.md](AI_CONFIGURATION.md)). |
 | **No streaming** | Blocking requests keep the initial implementation simple. Streaming wouldn't benefit a single-user local setup enough to justify the complexity. |
 | **Backward compatibility wrappers** | `build()` and `LLMProviderFactory` exist so code written against the earlier API keeps working. New code should prefer `build_context()`, `build_prompt()`, and `AIProviderFactory`. |

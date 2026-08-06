@@ -50,7 +50,7 @@ class BaseLLMProvider(ABC):
         """Returns a JSON string."""
 ```
 
-Every provider must implement `generate_response(prompt)` returning a JSON string. The JSON always contains `provider`, `model`, `success`, `response`, and `error` fields.
+Every provider must implement `generate_response(prompt)` returning a JSON string. The JSON carries `provider` and `success`; success responses include `response` (plus `model` and `tokens_used` where the provider tracks them), and failure responses carry `error`.
 
 ## Concrete Providers
 
@@ -147,7 +147,7 @@ REGISTERED_MODELS = {
     "qwen2.5-coder-1.5b-instruct": ModelInfo(provider="openai-compatible", local=True),
     "llama3.2": ModelInfo(provider="ollama", local=True),
     "gpt-4o-mini": ModelInfo(provider="openai", local=False),
-    # ... 10 more entries
+    # ... 9 more entries (13 total)
 }
 ```
 
@@ -190,4 +190,4 @@ Instantiate with model, base_url, api_key from AIConfig
 
 ## Planned Providers
 
-See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for providers on the horizon — Anthropic Claude, AWS Bedrock, Azure OpenAI, and others.
+See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for the cloud provider plan — the OpenAI and Gemini stubs are the next implementations on the horizon.

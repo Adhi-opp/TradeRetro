@@ -26,11 +26,12 @@ This isolation means the AI module can be developed, tested, and even replaced w
 
 - **Provider Abstraction** — Pluggable LLM providers via a factory and registry pattern
 - **Context Assembly** — Structured context builder that aggregates market, strategy, backtest, metrics, and portfolio data
-- **Prompt Engineering** — System prompt with persona definition, output rules, and safety constraints
+- **Context Injection** — The client automatically attaches the current backtest state (strategy, market, backtest, and metrics data) to every Copilot request
+- **Prompt Engineering** — 7-section system prompt with persona definition, integrity rules, quantitative reasoning guidance (metric interpretation, cross-metric reasoning, strategy-aware reasoning), and output rules
+- **Frontend Copilot Panel** — React chat panel with markdown rendering, in-session conversation history, example prompts, and quick actions
 - **Model Registry** — Static + dynamic model registration with Ollama discovery
 - **OpenAI-Compatible** — Primary provider targets LM Studio, vLLM, and any OpenAI-compatible endpoint
-- **Three API Endpoints** — Health check, model listing, and text generation
-- **Error Resilience** — Graceful handling of connection errors, timeouts, and missing models
+- **Automated Tests** — 279 tests including a 169-test AI suite covering the router, service, context builder, prompt builder, providers, and provider factory
 
 ## Architecture Overview
 
@@ -38,11 +39,10 @@ This isolation means the AI module can be developed, tested, and even replaced w
 ┌─────────────┐     ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
 │  FastAPI    │────▶│  AIService   │────▶│ ContextBuilder│     │  PromptBuilder│
 │  Router     │     │  (Orchestr.) │     │               │     │               │
-│ /api/ai/*   │     │              │     │ 6 domains     │     │ System+Context│
-└─────────────┘     └──────┬───────┘     └───────────────┘     │ +Output+User  │
-                           │                                    └──────┬───────┘
-                           │                                           │
-                           ▼                                           ▼
+│ /api/ai/*   │     │              │     │ 6 domains     │     │ 7 sections    │
+└─────────────┘     └──────┬───────┘     └───────────────┘     └──────┬───────┘
+                           │                                          │
+                           ▼                                          ▼
                     ┌──────────────┐                          ┌──────────────────┐
                     │ProviderFactory│                         │  Full Prompt     │
                     │  (Registry)   │                         │  (string)        │
@@ -84,28 +84,40 @@ python-engine/ai/
     └── strategy.md              Placeholder — strategy analysis prompt template
 ```
 
+Frontend integration lives in `client/src/`:
+
+```
+client/src/services/
+├── aiService.js                generate() — POST /api/ai/generate
+├── aiContextBuilder.js          buildAiContext() — normalizes backtest state into AI context
+└── ...
+client/src/store/useAIStore.js   Zustand store — messages, loading, panel state, sendMessage()
+client/src/components/copilot/   CopilotPanel, MarkdownRenderer, ConversationList, PromptInput, ...
+```
+
 ## Quick Links
 
 | Document | Description |
 |---|---|
-| [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) | Overall architecture, layers, request lifecycle, data flow |
-| [AI_BACKEND.md](AI_BACKEND.md) | Source-level walkthrough of every file |
-| [AI_API_REFERENCE.md](AI_API_REFERENCE.md) | Endpoint schemas, examples, status codes |
-| [AI_CONFIGURATION.md](AI_CONFIGURATION.md) | AIConfig defaults, provider settings, rationale |
-| [AI_PROVIDER_SYSTEM.md](AI_PROVIDER_SYSTEM.md) | Factory + registry patterns, all provider implementations |
-| [AI_PROMPT_ENGINEERING.md](AI_PROMPT_ENGINEERING.md) | Prompt structure, persona, safety design |
-| [AI_CONTEXT_BUILDER.md](AI_CONTEXT_BUILDER.md) | Domain assembly, envelope pattern, metadata |
-| [AI_MODEL_REGISTRY.md](AI_MODEL_REGISTRY.md) | Registered models, Ollama discovery, selection flow |
-| [AI_TESTING.md](AI_TESTING.md) | Manual test procedures, provider verification, unit test templates |
-| [AI_LIMITATIONS.md](AI_LIMITATIONS.md) | Known constraints and deliberate scope decisions |
-| [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) | Planned work across short/medium/long horizons |
-| [AI_CHANGELOG.md](AI_CHANGELOG.md) | Version history |
+| [AI_ARCHITECTURE.md](docs/ai/AI_ARCHITECTURE.md) | Overall architecture, layers, request lifecycle, data flow |
+| [AI_BACKEND.md](docs/ai/AI_BACKEND.md) | Source-level walkthrough of every file |
+| [AI_API_REFERENCE.md](docs/ai/AI_API_REFERENCE.md) | Endpoint schemas, examples, status codes |
+| [AI_CONFIGURATION.md](docs/ai/AI_CONFIGURATION.md) | AIConfig defaults, provider settings, rationale |
+| [AI_PROVIDER_SYSTEM.md](docs/ai/AI_PROVIDER_SYSTEM.md) | Factory + registry patterns, all provider implementations |
+| [AI_PROMPT_ENGINEERING.md](docs/ai/AI_PROMPT_ENGINEERING.md) | Prompt structure, persona, safety design |
+| [AI_CONTEXT_BUILDER.md](docs/ai/AI_CONTEXT_BUILDER.md) | Domain assembly, envelope pattern, metadata |
+| [AI_MODEL_REGISTRY.md](docs/ai/AI_MODEL_REGISTRY.md) | Registered models, Ollama discovery, selection flow |
+| [AI_TESTING.md](docs/ai/AI_TESTING.md) | Automated test suite layout, manual procedures, provider verification |
+| [AI_LIMITATIONS.md](docs/ai/AI_LIMITATIONS.md) | Known constraints and deliberate scope decisions |
+| [AI_FUTURE_ROADMAP.md](docs/ai/AI_FUTURE_ROADMAP.md) | Planned work across short/medium/long horizons |
+| [AI_CHANGELOG.md](docs/ai/AI_CHANGELOG.md) | Version history |
 
 ## Technology Stack
 
 | Component | Technology |
 |---|---|
 | Framework | FastAPI (Python 3.12) |
+| Frontend | React 19 + Zustand (`useAIStore`) + `react-markdown` / `remark-gfm` |
 | LLM Backend | LM Studio (primary: Qwen2.5-Coder-1.5B) |
 | Provider Protocol | OpenAI-Compatible API (`/v1/chat/completions`) |
 | HTTP Client | `httpx` |
@@ -115,10 +127,12 @@ python-engine/ai/
 
 ## Current Status
 
-**Version:** 1.0.0 — Initial implementation.
+**Version:** 1.1.0 — Frontend integration, context injection, and prompt-engineering enhancements (see [AI_CHANGELOG.md](docs/ai/AI_CHANGELOG.md)).
 
-All three endpoints (`health`, `models`, `generate`) are operational over the `/api/ai/*` prefix. The primary working provider is `openai-compatible` targeting LM Studio at `http://localhost:1234`. Two stub providers (OpenAI, Gemini) exist but return not-implemented errors. Prompt templates in `ai/prompts/` are placeholders — the active system prompt lives in code.
+All three endpoints (`health`, `models`, `generate`) are operational over the `/api/ai/*` prefix. The AI Copilot panel is integrated into the React Dashboard: users can chat with the assistant, and the client automatically attaches the current backtest state (strategy, market, backtest, and metrics data) as context. Responses are rendered as rich markdown via `react-markdown`.
 
-**No frontend integration yet.** The React client doesn't reference any AI endpoint. The API is ready for consumption but no chat UI or settings panel exists. This was a deliberate sequencing choice: building the backend contract first, then wiring the UI in a follow-up milestone.
+The primary working provider is `openai-compatible` targeting LM Studio at `http://localhost:1234`. Two stub providers (OpenAI, Gemini) exist but return not-implemented errors. Prompt templates in `ai/prompts/` are placeholders — the active 7-section system prompt lives in code.
+
+The automated test suite contains **279 tests**, of which **169 cover the AI module** (router, service, context builder, prompt builder, providers, and provider factory).
 
 Stub providers (OpenAI, Gemini) are included for two reasons: to establish the registry schema for cloud models, and to make the intended provider scope visible via `GET /api/ai/models` from day one.

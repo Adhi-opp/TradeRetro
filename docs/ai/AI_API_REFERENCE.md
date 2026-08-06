@@ -203,8 +203,8 @@ Content-Type: application/json
         "metadata": {
             "generated_at": "2026-07-25T03:00:00.000000+00:00",
             "total_domains": 6,
-            "populated_domains": 2,
-            "domains_with_data": ["user", "metrics"]
+            "populated_domains": 1,
+            "domains_with_data": ["metrics"]
         }
     },
     "response": {
@@ -222,7 +222,26 @@ Content-Type: application/json
 | Code | Description |
 |---|---|
 | 200 | Generation completed (check `success` field for LLM result) |
-| 422 | Validation error (e.g., missing `user_query`) |
+| 400 | Validation error — `VALIDATION_ERROR` with message and details (e.g., missing `user_query`, malformed JSON, wrong field types) |
+
+### Error Response
+
+A validation failure (empty body, missing `user_query`, malformed JSON, or wrong field types) returns HTTP 400 with a structured error body:
+
+```json
+{
+    "error": "VALIDATION_ERROR",
+    "message": "Invalid request payload",
+    "details": [
+        {
+            "type": "missing",
+            "loc": ["body", "user_query"],
+            "msg": "Field required",
+            "input": {}
+        }
+    ]
+}
+```
 
 ### Notes
 
