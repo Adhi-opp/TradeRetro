@@ -112,7 +112,7 @@ GET /api/ai/models
 
 - The response includes both statically registered models and any dynamically discovered Ollama models.
 - If Ollama is not running or not installed, only static models are returned (no error).
-- The `local` field distinguishes between local models (`true`) and cloud API models (`false`, e.g., GPT-4o Mini, Gemini Pro).
+- The `local` field distinguishes between local models (`true`) and cloud API models (`false`, e.g., GPT-4o Mini, Gemini Flash).
 
 ---
 

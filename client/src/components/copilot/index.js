@@ -1,5 +1,6 @@
 export { default as CopilotPanel } from './CopilotPanel';
 export { default as CopilotHeader } from './CopilotHeader';
+export { default as ModelSelector } from './ModelSelector';
 export { default as EmptyState } from './EmptyState';
 export { default as PromptInput } from './PromptInput';
 export { default as QuickActions } from './QuickActions';

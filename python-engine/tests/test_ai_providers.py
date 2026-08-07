@@ -1,5 +1,5 @@
 """
-Tests for ai providers — Mock, OpenAI-compatible, Ollama, OpenAI and Gemini.
+Tests for ai providers — Mock, OpenAI-compatible, Ollama, Gemini and OpenAI.
 
 Covers the provider behaviour contract:
 
@@ -7,7 +7,9 @@ Covers the provider behaviour contract:
   * OpenAICompatibleProvider: prompt transmission, payload shape, and the
     HTTP 404 / connect / timeout / generic-exception / empty-response paths.
   * OllamaProvider: request payload and success/failure behaviour.
-  * OpenAI / Gemini stubs: structured "not implemented" responses.
+  * GeminiProvider: generateContent payload shape, key transmission, and the
+    auth-failure / timeout / malformed-response / unavailable paths.
+  * OpenAI stub: structured "not implemented" response.
   * BaseLLMProvider: abstract contract cannot be instantiated directly.
 """
 
@@ -26,6 +28,7 @@ from ai.providers.openai_provider import OpenAIProvider
 
 CHAT_URL = "http://localhost:1234/v1/chat/completions"
 OLLAMA_URL = "http://localhost:11434/api/generate"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
 
 
 class _FakeResponse:
@@ -61,8 +64,9 @@ class _RecordingClient:
     def __exit__(self, *_exc):
         return False
 
-    def post(self, url, json=None, headers=None):
+    def post(self, url, params=None, json=None, headers=None):
         self.last_url = url
+        self.last_params = params
         self.last_json = json
         self.last_headers = headers
         if isinstance(self.response, Exception):
@@ -75,6 +79,10 @@ class _RecordingClient:
 def _provider_module(provider):
     if isinstance(provider, OpenAICompatibleProvider):
         import ai.providers.openai_compatible_provider as module
+
+        return module
+    if isinstance(provider, GeminiProvider):
+        import ai.providers.gemini_provider as module
 
         return module
     import ai.ollama_provider as module
@@ -95,6 +103,17 @@ def _openai_compatible(model="qwen2.5-coder-7b-instruct", **kwargs) -> OpenAICom
 
 def _ollama(model="llama3.2", **kwargs) -> OllamaProvider:
     return OllamaProvider(model=model, **kwargs)
+
+
+def _gemini(model="gemini-3.6-flash", **kwargs) -> GeminiProvider:
+    return GeminiProvider(model=model, **kwargs)
+
+
+def _gemini_success_payload():
+    return {
+        "candidates": [{"content": {"parts": [{"text": "  Hello from Gemini  "}]}}],
+        "usageMetadata": {"promptTokenCount": 10, "candidatesTokenCount": 5, "totalTokenCount": 15},
+    }
 
 
 def _success_payload():
@@ -356,16 +375,148 @@ class TestStubProviders:
         assert "not yet implemented" in body["error"]
         assert body["response"] is None
 
-    def test_gemini_stub_not_implemented(self):
-        body = json.loads(GeminiProvider().generate_response("hi"))
-        assert body["provider"] == "gemini"
-        assert body["success"] is False
-        assert "not yet implemented" in body["error"]
-        assert body["response"] is None
-
     def test_stubs_are_base_providers(self):
         assert isinstance(OpenAIProvider(), BaseLLMProvider)
         assert isinstance(GeminiProvider(), BaseLLMProvider)
+
+
+# ── GeminiProvider ──────────────────────────────────────────────────────────
+
+
+class TestGeminiProvider:
+    def test_success_parses_response(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _gemini_success_payload())
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["provider"] == "gemini"
+        assert body["success"] is True
+        assert body["response"] == "Hello from Gemini"
+        assert body["tokens_used"] == {"prompt": 10, "completion": 5, "total": 15}
+
+    def test_prompt_transmitted_in_parts(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _gemini_success_payload())
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("the user prompt")
+        assert client.last_url == GEMINI_URL
+        assert client.last_json["contents"] == [
+            {"role": "user", "parts": [{"text": "the user prompt"}]},
+        ]
+
+    def test_api_key_sent_as_query_param(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _gemini_success_payload())
+        provider = _gemini(api_key="super-secret-key")
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert client.last_params == {"key": "super-secret-key"}
+
+    def test_generation_config_sent_when_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _gemini_success_payload())
+        provider = _gemini(api_key="gem-key", temperature=0.2, max_tokens=1024)
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert client.last_json["generationConfig"] == {
+            "temperature": 0.2,
+            "maxOutputTokens": 1024,
+        }
+
+    def test_generation_config_omitted_when_not_configured(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, _gemini_success_payload())
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            provider.generate_response("hi")
+        assert "generationConfig" not in client.last_json
+
+    def test_missing_api_key_returns_structured_error(self):
+        provider = _gemini(api_key="")
+        body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "GEMINI_API_KEY" in body["error"]
+        assert body["response"] is None
+
+    def test_authentication_failure_returns_message(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(401, {"error": {"message": "API key not valid. Please pass a valid API key."}})
+        provider = _gemini(api_key="bad-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "API key not valid" in body["error"]
+
+    def test_forbidden_returns_auth_error_without_body(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(403, None)
+        provider = _gemini(api_key="bad-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "authentication failed" in body["error"]
+
+    def test_model_not_found_returns_message(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(404, {"error": {"message": "models/foo not found"}})
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "models/foo not found" in body["error"]
+
+    def test_no_candidates_returns_error(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(200, {"candidates": []})
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "no candidates" in body["error"]
+
+    def test_empty_text_returns_error(self):
+        client = _RecordingClient()
+        client.response = _FakeResponse(
+            200,
+            {"candidates": [{"content": {"parts": [{"text": "   "}]}}]},
+        )
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "empty response" in body["error"]
+
+    def test_connect_error_returns_message(self):
+        client = _RecordingClient()
+        client.response = httpx.ConnectError("Connection refused")
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "Cannot connect to Gemini" in body["error"]
+
+    def test_timeout_error_returns_message(self):
+        client = _RecordingClient()
+        client.response = httpx.TimeoutException("slow")
+        provider = _gemini(api_key="gem-key")
+        with _httpx_client_patch(provider, client):
+            body = json.loads(provider.generate_response("hi"))
+        assert body["success"] is False
+        assert "timed out" in body["error"]
+
+    def test_unknown_exception_never_propagates(self):
+        for exc in (ValueError("v"), KeyError("k"), httpx.TimeoutException("t")):
+            client = _RecordingClient()
+            client.response = exc
+            provider = _gemini(api_key="gem-key")
+            with _httpx_client_patch(provider, client):
+                body = json.loads(provider.generate_response("hi"))
+            assert body["success"] is False
+
+    def test_is_base_llm_provider(self):
+        assert isinstance(_gemini(api_key="gem-key"), BaseLLMProvider)
 
 
 # ── Base contract ────────────────────────────────────────────────────────────

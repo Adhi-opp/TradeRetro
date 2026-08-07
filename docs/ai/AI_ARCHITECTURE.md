@@ -69,7 +69,7 @@ The same principle applies to the provider abstraction. The service layer never 
 │       ├── OllamaProvider         — local Ollama API (port 11434)    │
 │       ├── OpenAICompatibleProvider — LM Studio / vLLM (port 1234)  │
 │       ├── OpenAIProvider         — stub (not implemented)           │
-│       └── GeminiProvider         — stub (not implemented)           │
+│       └── GeminiProvider         — Google Gemini Flash (cloud API)  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

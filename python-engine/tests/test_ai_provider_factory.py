@@ -93,7 +93,7 @@ class TestModelResolution:
         assert isinstance(factory.get_provider("gpt-4o-mini"), OpenAIProvider)
 
     def test_gemini_cloud_model_resolves(self, factory):
-        assert isinstance(factory.get_provider("gemini-pro"), GeminiProvider)
+        assert isinstance(factory.get_provider("gemini-3.6-flash"), GeminiProvider)
 
     def test_all_registered_models_resolve(self, factory):
         from ai.registry import REGISTERED_MODELS
@@ -164,6 +164,40 @@ class TestOpenAICompatibleWiring:
     def test_all_providers_subclass_base(self, factory):
         for name in ("mock", "ollama", "gemini", "openai", "openai-compatible"):
             assert isinstance(factory.get_provider(name), BaseLLMProvider), name
+
+
+# ── Gemini wiring ───────────────────────────────────────────────────────────
+
+
+class TestGeminiWiring:
+    def test_wiring_uses_config_values(self):
+        config = AIConfig(
+            gemini_model="custom-gemini-model",
+            gemini_api_key="gemini-secret",
+            gemini_base_url="http://gemini.example.com",
+        )
+        factory = AIProviderFactory(config=config)
+        provider = factory.get_provider("gemini")
+        assert isinstance(provider, GeminiProvider)
+        assert provider.model == "custom-gemini-model"
+        assert provider.api_key == "gemini-secret"
+        assert provider.base_url == "http://gemini.example.com"
+
+    def test_registered_gemini_model_uses_resolved_model_id(self):
+        config = AIConfig(gemini_api_key="gemini-secret")
+        factory = AIProviderFactory(config=config)
+        provider = factory.get_provider("gemini-3.6-flash")
+        assert isinstance(provider, GeminiProvider)
+        assert provider.model == "gemini-3.6-flash"
+        assert provider.api_key == "gemini-secret"
+
+    def test_wiring_propagates_temperature_and_max_tokens(self):
+        config = AIConfig(temperature=0.7, max_tokens=512)
+        factory = AIProviderFactory(config=config)
+        provider = factory.get_provider("gemini")
+        assert isinstance(provider, GeminiProvider)
+        assert provider.temperature == 0.7
+        assert provider.max_tokens == 512
 
 
 # ── Configuration wiring ──────────────────────────────────────────────────────

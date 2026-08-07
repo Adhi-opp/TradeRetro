@@ -10,7 +10,7 @@ The AI module has a dedicated automated test suite. The full backend suite stand
 | `test_ai_service.py` | `AIService` orchestration: success/error payload shapes, exception containment, provider selection, context propagation |
 | `test_ai_context_builder.py` | 6-domain context assembly, envelope schema, metadata, user domain behaviour, legacy `build()` wrapper |
 | `test_ai_prompt_builder.py` | 7-section prompt structure, ordering, determinism, reasoning registries, legacy `build()` wrapper |
-| `test_ai_providers.py` | Mock, OpenAI-compatible, and Ollama providers plus OpenAI/Gemini stubs, including all error paths |
+| `test_ai_providers.py` | Mock, OpenAI-compatible, Ollama, and Gemini providers plus the OpenAI stub, including all error paths |
 | `test_ai_provider_factory.py` | Provider resolution, registry fallback, openai-compatible wiring, legacy `LLMProviderFactory` |
 
 This document also serves as a manual testing reference for live provider verification.
@@ -255,18 +255,35 @@ Without Ollama, returns:
 }
 ```
 
-### OpenAI / Gemini Providers (Stubs)
+### OpenAI Provider (Stub)
 
-Both return:
+Returns:
 
 ```json
 {
-    "provider": "openai"|"gemini",
+    "provider": "openai",
     "success": false,
-    "error": "... provider is not yet implemented",
+    "error": "OpenAI provider is not yet implemented",
     "response": null
 }
 ```
+
+### Gemini Provider (Cloud)
+
+Returns real Gemini output when `GEMINI_API_KEY` is configured and the network can reach Google's API. Uses `gemini-3.6-flash` by default (see `AIConfig.gemini_model` / `GEMINI_MODEL`).
+
+Without an API key, returns:
+
+```json
+{
+    "provider": "gemini",
+    "success": false,
+    "error": "No Gemini API key configured. Set GEMINI_API_KEY and restart the server.",
+    "response": null
+}
+```
+
+With an invalid key, returns an authentication failure error (e.g. HTTP 401). Generation typically completes in 1–5 seconds over the network.
 
 ## Automated Test Strategy
 
@@ -276,7 +293,7 @@ The AI suite is organized by module layer so a failure pinpoints the responsible
 - **Service tests** inject a deterministic fake factory/provider to verify orchestration: payload shapes, strict exception containment (no uncaught exceptions escape to the API), JSON parsing fallback (`{"raw_response": ...}`), and provider/query passthrough.
 - **Context builder tests** verify the envelope schema stability, the user domain's non-envelope contract, metadata, and the legacy `build()` wrapper.
 - **Prompt builder tests** verify the exact 7-section structure, heading order and ruling, byte-identical determinism, and that all three reasoning registries are rendered.
-- **Provider tests** mock `httpx` to cover success and every documented error path (404, connect error, timeout, empty content, missing choices) for mock, openai-compatible, and Ollama.
+- **Provider tests** mock `httpx` to cover success and every documented error path (404, connect error, timeout, empty content, missing choices, auth failure) for mock, openai-compatible, Ollama, and Gemini.
 - **Provider factory tests** cover resolution via registry, provider-name fallback, case-insensitivity, openai-compatible `AIConfig` wiring, and error-message content.
 
 ## Running Tests
@@ -303,4 +320,4 @@ Router tests stub `services.db` and `services.redis_client` and patch Ollama dis
 |---|---|---|
 | Mock generate | any prompt | `"Mock response generated successfully."` |
 | OpenAI stub | any prompt | `None` (with `success: false`) |
-| Gemini stub | any prompt | `None` (with `success: false`) |
+| Gemini without API key | any prompt | `None` (with `success: false`, "No Gemini API key configured") |

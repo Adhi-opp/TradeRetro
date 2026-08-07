@@ -77,7 +77,7 @@ python-engine/ai/
 │   ├── mock_provider.py         MockLLMProvider (deterministic testing)
 │   ├── openai_provider.py       OpenAI provider (stub)
 │   ├── openai_compatible_provider.py  OpenAI-compatible provider (primary)
-│   └── gemini_provider.py       Gemini provider (stub)
+│   └── gemini_provider.py       Gemini provider (Google Gemini Flash)
 └── prompts/
     ├── risk.md                  Placeholder — risk assessment prompt template
     ├── metrics.md               Placeholder — metrics explanation prompt template

@@ -19,7 +19,7 @@ The following limitations apply to the current implementation. These are known c
 
 | Limitation | Description |
 |---|---|
-| **Local Inference Only** | The only working providers (mock, openai-compatible, ollama) run locally. Cloud providers (OpenAI, Gemini) are stubs only. |
+| **Local Inference Only** | Mock, openai-compatible, and Ollama providers run locally. The Gemini provider calls the Google cloud API (requires `GEMINI_API_KEY`); OpenAI remains a stub. |
 | **Single Provider Per Instance** | The factory can instantiate any provider, but there is no load balancing or failover between providers. |
 | **No Provider Health Checks** | The `/api/ai/health` endpoint does not verify whether the configured provider is reachable. A provider connection error is only surfaced when a `POST /api/ai/generate` request is made. |
 | **No Retry Logic** | If a provider call fails (timeout, connection error), the error is returned to the client immediately. No automatic retry is attempted. |
@@ -36,7 +36,7 @@ The following limitations apply to the current implementation. These are known c
 
 | Limitation | Description |
 |---|---|
-| **No Environment Variable Overrides** | AI configuration is hardcoded in `AIConfig` dataclass. There are no environment variable overrides. Changing settings (e.g., LM Studio port, temperature) requires editing `config.py`. |
+| **Limited Environment Variable Overrides** | Only the Gemini fields support environment variable overrides (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_BASE_URL`). All other AI configuration is hardcoded in `AIConfig`. Changing settings (e.g., LM Studio port, temperature) requires editing `config.py`. |
 | **No Runtime Configuration API** | There is no API endpoint to read or update configuration at runtime. `AIConfigurationManager` exists but is not exposed via HTTP. |
 | **No Per-Request Provider Configuration** | The `provider_name` field selects the model/provider, but per-request parameters (temperature, max_tokens, etc.) cannot be overridden from the API. |
 

@@ -2,6 +2,27 @@
 
 All notable changes to the TradeRetro AI Copilot module.
 
+## 1.2.0 (2026-08-07)
+
+This release replaces the Gemini stub with a production-ready Gemini provider.
+
+### Added
+
+- **GeminiProvider** — `ai/providers/gemini_provider.py` now calls Google's Gemini `generateContent` REST API, targeting the current recommended Gemini Flash model `gemini-3.6-flash`. Structured error handling covers missing API key, authentication failure (HTTP 401/403), model not found, connection refused, timeout, no candidates, and empty text. Token tracking via `usageMetadata`.
+- **Gemini Configuration** — `AIConfig` gains `gemini_api_key`, `gemini_model`, and `gemini_base_url`, each defaulting to the `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL` environment variables (loadable from `.env`).
+- **Factory Wiring** — `AIProviderFactory` resolves Gemini exactly like the other providers, passing model, api key, and base URL from `AIConfig`.
+- **Registry** — `gemini-3.6-flash` (display name "Gemini Flash") registered as a `gemini` provider entry (14 static entries total). Frontend only sees display names.
+- **Environment Template** — `.env.example` documents `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL`.
+- **Tests** — Gemini provider tests covering success, authentication failure, timeout, malformed response, provider unavailable, and empty/missing API key; factory wiring and config env-override tests. Full backend suite now at 339 tests.
+
+### Changed
+
+- **Documentation** — Registry, provider system, configuration, backend, testing, limitations, architecture, roadmap, and changelog docs updated to reflect the working Gemini provider.
+
+### Unchanged
+
+- `PromptBuilder`, `ContextBuilder`, report registry, router, `AIService` architecture, and the OpenAI stub are untouched. No streaming, memory, tool calling, images, voice, agents, RAG, new endpoints, or new UI.
+
 ## 1.1.0 (2026-08-06)
 
 This release delivers frontend integration, context injection, prompt-engineering

@@ -14,6 +14,9 @@ This document describes completed milestones and planned improvements to the AI 
 - ✅ Comprehensive AI test suite: 169 AI tests across the router, service, context builder, prompt builder, providers, and provider factory (279 tests in the full suite)
 - ✅ Coverage for error paths (connection refused, timeout, unknown provider, validation errors)
 
+### Cloud Providers
+- ✅ Gemini provider implemented (`gemini-3.6-flash`, `generateContent` REST API), configured via `GEMINI_API_KEY` / `GEMINI_MODEL` / `GEMINI_BASE_URL`
+
 ## Short-Term (Next 1–2 Milestones)
 
 ### Model Selection UI
@@ -42,9 +45,8 @@ This document describes completed milestones and planned improvements to the AI 
 - Maintain a rolling window of recent messages per session
 - Include conversation history in the prompt for context
 
-### Cloud Provider Implementation
+### OpenAI Provider Implementation
 - Implement the OpenAI provider with a real API key and `openai` Python SDK
-- Implement the Gemini provider with Google's generative AI SDK
 - Add API key management (store, validate, rotate keys)
 - Add cloud/local toggle in the frontend settings
 

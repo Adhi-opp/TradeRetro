@@ -9,6 +9,8 @@ Locks the runtime cleanup contract:
   * reset_defaults() restores the factory state.
 """
 
+import os
+
 import pytest
 
 from ai.config import AIConfig, AIConfigurationManager
@@ -37,6 +39,25 @@ class TestAIConfig:
         cfg = AIConfig(temperature=0.5, max_tokens=512)
         assert cfg.temperature == 0.5
         assert cfg.max_tokens == 512
+
+    def test_gemini_defaults(self):
+        cfg = AIConfig()
+        assert cfg.gemini_model == os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
+        assert cfg.gemini_base_url == os.environ.get(
+            "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com"
+        )
+
+    def test_gemini_api_key_default_is_empty(self):
+        if "GEMINI_API_KEY" not in os.environ:
+            assert AIConfig().gemini_api_key == ""
+
+    def test_gemini_api_key_reads_from_environment(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "env-test-key")
+        assert AIConfig().gemini_api_key == "env-test-key"
+
+    def test_gemini_model_reads_from_environment(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_MODEL", "gemini-custom")
+        assert AIConfig().gemini_model == "gemini-custom"
 
 
 # ── AIConfigurationManager ─────────────────────────────────────────────────────

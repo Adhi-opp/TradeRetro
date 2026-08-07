@@ -36,7 +36,7 @@ The static registry (`REGISTERED_MODELS`) contains 13 entries:
 
 | ID | Display Name | Provider | Local |
 |---|---|---|---|
-| `gemini-pro` | Gemini Pro | `gemini` | No |
+| `gemini-3.6-flash` | Gemini Flash | `gemini` | No |
 
 ### OpenAI (Cloud)
 
@@ -103,10 +103,15 @@ When a user submits a request to `POST /api/ai/generate`, the `provider_name` fi
 
 ## Model Listing
 
-`GET /api/ai/models` calls `list_models()` which merges static and discovered models and returns them as a list. The response includes both working providers and stubs (OpenAI, Gemini) so clients can see the full intended scope.
+`GET /api/ai/models` calls `list_models()` which merges static and discovered models and returns them as a list. The response includes working providers (mock, openai-compatible, ollama, gemini) and the remaining OpenAI stub so clients can see the full intended scope.
 
 ## Cloud Model Status
 
-Cloud models (GPT-4o Mini, Gemini Pro) are registered but backed by stub providers that return "not implemented" errors. The registry schema already supports them — when real cloud providers land, only the implementation classes need to change. The `local` flag is already in place for the UI to distinguish local from cloud models.
+Cloud models are backed by real or stub providers:
+
+- **Gemini** (Flash and Pro) — backed by the working `GeminiProvider` calling Google's `generateContent` API. `gemini-3.6-flash` is the current recommended Gemini Flash model and is the provider default.
+- **GPT-4o Mini** — registered but backed by the `OpenAIProvider` stub that returns "not implemented" errors.
+
+The `local` flag distinguishes local from cloud models in the UI (`true` = runs on this machine, `false` = requires a cloud API call).
 
 See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for the cloud provider plan.

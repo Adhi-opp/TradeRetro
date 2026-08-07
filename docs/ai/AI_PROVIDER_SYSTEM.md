@@ -103,7 +103,29 @@ Stub. Returns `{"provider": "openai", "success": false, "error": "OpenAI provide
 
 ### GeminiProvider (`ai/providers/gemini_provider.py`)
 
-Stub. Returns `{"provider": "gemini", "success": false, "error": "Gemini provider is not yet implemented", "response": null}` on every call.
+Working. Calls Google's Gemini `generateContent` REST API, targeting the Gemini Flash model family (default `"gemini-3.6-flash"`).
+
+| Constructor param | Default | Note |
+|---|---|---|
+| `model` | `"gemini-3.6-flash"` | Overridden by `AIProviderFactory` with the resolved model ID |
+| `api_key` | `""` | Google AI Studio API key; wired from `AIConfig.gemini_api_key` |
+| `base_url` | `"https://generativelanguage.googleapis.com"` | Overridden by `AIConfig.gemini_base_url` |
+| `timeout_seconds` | `60` | Request timeout |
+| `temperature` | `None` | Sent via `generationConfig.temperature` when set |
+| `max_tokens` | `None` | Sent via `generationConfig.maxOutputTokens` when set |
+
+```python
+provider = GeminiProvider(
+    model="gemini-3.6-flash",
+    api_key="YOUR_KEY",
+)
+```
+
+**Request:** `POST {base_url}/v1beta/models/{model}:generateContent?key={api_key}` with body `{"contents": [{"role": "user", "parts": [{"text": prompt}]}]}` plus `generationConfig` when temperature/max_tokens are set.
+
+**Error handling:** missing API key, authentication failure (HTTP 401/403), model not found (HTTP 400/404), `ConnectError`, `TimeoutException`, no candidates, empty text. Each returns a structured JSON error.
+
+**Token tracking:** Extracts `usageMetadata.promptTokenCount`, `candidatesTokenCount`, and `totalTokenCount` when present.
 
 ## Factory Pattern
 
@@ -133,6 +155,8 @@ class AIProviderFactory:
 
         if provider_type == "openai-compatible":
             return cls(model=..., base_url=..., api_key=...)
+        if provider_type == "gemini":
+            return cls(model=..., api_key=..., base_url=...)
         return cls()
 ```
 
@@ -190,4 +214,4 @@ Instantiate with model, base_url, api_key from AIConfig
 
 ## Planned Providers
 
-See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for the cloud provider plan — the OpenAI and Gemini stubs are the next implementations on the horizon.
+See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for the cloud provider plan — the Gemini provider is implemented; the OpenAI stub is the next implementation on the horizon.

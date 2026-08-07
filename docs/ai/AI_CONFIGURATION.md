@@ -1,6 +1,6 @@
 # AI Configuration
 
-Configuration for the AI Copilot is entirely self-contained within `python-engine/ai/config.py`. There are no environment variables and no central `Settings` class fields for AI — the `AIConfig` dataclass holds everything.
+Configuration for the AI Copilot is largely self-contained within `python-engine/ai/config.py`. There are no central `Settings` class fields for AI — the `AIConfig` dataclass holds everything. The Gemini fields additionally support environment variable overrides (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_BASE_URL`), see [Environment Variable Overrides](#why-hardcoded-defaults-with-env-overrides-for-gemini) below.
 
 ## AIConfig
 
@@ -17,6 +17,9 @@ Configuration for the AI Copilot is entirely self-contained within `python-engin
 | `debug` | `bool` | `False` | Enable debug-level logging |
 | `openai_compatible_base_url` | `str` | `"http://localhost:1234"` | Base URL for openai-compatible provider |
 | `openai_compatible_api_key` | `str` | `"not-needed"` | API key for openai-compatible provider |
+| `gemini_api_key` | `str` | `""` | Google Gemini API key; defaults to the `GEMINI_API_KEY` env var |
+| `gemini_model` | `str` | `"gemini-3.6-flash"` | Gemini model ID; defaults to the `GEMINI_MODEL` env var |
+| `gemini_base_url` | `str` | `"https://generativelanguage.googleapis.com"` | Gemini API base URL; defaults to the `GEMINI_BASE_URL` env var |
 
 ## AIConfigurationManager
 
@@ -37,7 +40,7 @@ The provider is selected at runtime by `AIProviderFactory.get_provider()`. The i
 1. **A model ID** (e.g., `"qwen2.5-coder-1.5b-instruct"`) — looked up in the registry to find the provider type
 2. **A provider name** (e.g., `"mock"`, `"ollama"`) — used directly if not found in the registry
 
-The `openai-compatible` provider is special — it receives `model`, `base_url`, and `api_key` from `AIConfig`. All other providers are instantiated with no arguments (they use their own hardcoded defaults). This avoids coupling every provider to the same configuration schema — Ollama doesn't need an API key, and the mock provider doesn't need a base URL.
+The `openai-compatible` and `gemini` providers are wired with their connection details from `AIConfig` — the openai-compatible provider receives `model`, `base_url`, and `api_key`; the gemini provider receives `model`, `api_key`, and `base_url`. All other providers are instantiated with no arguments (they use their own hardcoded defaults). This avoids coupling every provider to the same configuration schema — Ollama doesn't need an API key, and the mock provider doesn't need a base URL.
 
 ## Model Configuration
 
@@ -61,14 +64,16 @@ To use LM Studio:
 
 ## Tradeoffs
 
-### Why hardcoded defaults instead of environment variables?
+### Why hardcoded defaults, with env overrides for Gemini?
 
-The AI module is a self-contained subsystem. Hardcoded defaults mean:
+The AI module is a self-contained subsystem. Local providers (openai-compatible, ollama, mock) keep hardcoded defaults:
 - No additional environment variables needed in `.env` or deployment configs
 - The module works out of the box if LM Studio is running on the same machine
 - Configuration changes are explicit code changes (traceable in version control)
 
 The trade-off is that changing settings (e.g., pointing to a different LM Studio port) requires a code change rather than an env var override.
+
+The Gemini provider is different — it is a cloud API requiring a secret. Its three fields (`gemini_api_key`, `gemini_model`, `gemini_base_url`) default to the `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL` environment variables (optionally defined in `.env`), falling back to built-in defaults when the variables are unset. This keeps the API key out of source control.
 
 ### Why separate timeout values?
 

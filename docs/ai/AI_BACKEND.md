@@ -23,7 +23,7 @@ Every source file in the `python-engine/ai/` module, its purpose, dependencies, 
 | `providers/mock_provider.py` | Provider | `MockLLMProvider` — deterministic testing |
 | `providers/openai_provider.py` | Provider | `OpenAIProvider` — stub (not implemented) |
 | `providers/openai_compatible_provider.py` | Provider | `OpenAICompatibleProvider` — primary working provider |
-| `providers/gemini_provider.py` | Provider | `GeminiProvider` — stub (not implemented) |
+| `providers/gemini_provider.py` | Provider | `GeminiProvider` — Google Gemini generateContent API |
 | `prompts/risk.md` | Template | Placeholder — risk assessment prompt |
 | `prompts/metrics.md` | Template | Placeholder — metrics explanation prompt |
 | `prompts/strategy.md` | Template | Placeholder — strategy analysis prompt |
@@ -47,14 +47,17 @@ Houses `AIConfig` (a plain `@dataclass`) and `AIConfigurationManager` for valida
 | `model` | `"qwen2.5-coder-1.5b-instruct"` | Default model ID |
 | `temperature` | `0.2` | Sampler temperature (configured default; not currently passed to providers) |
 | `max_tokens` | `1024` | Max response tokens (configured default; not currently passed to providers) |
-| `timeout_seconds` | `30` | Reserved; providers use their own internal timeouts (`OpenAICompatibleProvider` 120s, `OllamaProvider` 60s) |
+| `timeout_seconds` | `30` | Reserved; providers use their own internal timeouts (`OpenAICompatibleProvider` 120s, `OllamaProvider` 60s, `GeminiProvider` 60s) |
 | `debug` | `False` | Debug logging |
 | `openai_compatible_base_url` | `"http://localhost:1234"` | LM Studio default |
 | `openai_compatible_api_key` | `"not-needed"` | Local servers rarely need auth |
+| `gemini_api_key` | `""` | Gemini API key; defaults to `GEMINI_API_KEY` env var |
+| `gemini_model` | `"gemini-3.6-flash"` | Gemini model ID; defaults to `GEMINI_MODEL` env var |
+| `gemini_base_url` | `"https://generativelanguage.googleapis.com"` | Gemini API base URL; defaults to `GEMINI_BASE_URL` env var |
 
 `AIConfigurationManager` wraps the dataclass with validation: temperature is clamped to `[0.0, 2.0]`, `max_tokens` must be positive. `reset_defaults()` restores factory state.
 
-AI configuration is intentionally self-contained — no environment variable overrides, no entries in the central `Settings` class. This keeps deployment simple (nothing extra to configure) at the cost of requiring code changes for different environments.
+AI configuration is intentionally self-contained. The Gemini fields also support environment variable overrides (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_BASE_URL`); other fields require code changes for different environments.
 
 **Imported by:** `service.py`, `provider_factory.py`, `llm_provider.py`.
 
@@ -269,9 +272,9 @@ Error handling covers model-not-loaded (404), connection refused, timeout, empty
 
 Returns `{"provider": "openai", "success": false, "error": "OpenAI provider is not yet implemented", "response": null}`.
 
-### `gemini_provider.py` (Stub)
+### `gemini_provider.py`
 
-Returns `{"provider": "gemini", "success": false, "error": "Gemini provider is not yet implemented", "response": null}`.
+Working Gemini provider targeting the Gemini Flash model family (default `"gemini-3.6-flash"`). Calls `POST {base_url}/v1beta/models/{model}:generateContent?key={api_key}` with a `contents` payload. Returns the joined text from `candidates[0].content.parts` and token counts from `usageMetadata`. Error handling covers missing API key, authentication failure (HTTP 401/403), model not found, connection refused, timeout, no candidates, and empty text — each returns a structured JSON error.
 
 ---
 

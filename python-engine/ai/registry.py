@@ -37,7 +37,7 @@ REGISTERED_MODELS: Dict[str, ModelInfo] = {
     "llama3.1": ModelInfo(id="llama3.1", display_name="Llama 3.1", provider="ollama", local=True),
     "mistral": ModelInfo(id="mistral", display_name="Mistral", provider="ollama", local=True),
     "gemma2": ModelInfo(id="gemma2", display_name="Gemma 2", provider="ollama", local=True),
-    "gemini-pro": ModelInfo(id="gemini-pro", display_name="Gemini Pro", provider="gemini", local=False),
+    "gemini-3.6-flash": ModelInfo(id="gemini-3.6-flash", display_name="Gemini Flash", provider="gemini", local=False),
     "gpt-4o-mini": ModelInfo(id="gpt-4o-mini", display_name="GPT-4o Mini", provider="openai", local=False),
     "qwen2.5-coder-1.5b-instruct": ModelInfo(
         id="qwen2.5-coder-1.5b-instruct",

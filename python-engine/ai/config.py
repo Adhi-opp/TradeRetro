@@ -4,7 +4,18 @@ This module provides the AIConfig dataclass and AIConfigurationManager class
 for managing AI Copilot settings.
 """
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
 
 
 @dataclass
@@ -17,6 +28,15 @@ class AIConfig:
     timeout_seconds: int = 30  # reserved; providers use their own internal timeouts
     openai_compatible_base_url: str = "http://localhost:1234"
     openai_compatible_api_key: str = "not-needed"
+    gemini_api_key: str = field(
+        default_factory=lambda: os.getenv("GEMINI_API_KEY", ""),
+    )
+    gemini_model: str = field(
+        default_factory=lambda: os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+    )
+    gemini_base_url: str = field(
+        default_factory=lambda: os.getenv("GEMINI_BASE_URL", DEFAULT_GEMINI_BASE_URL),
+    )
 
 
 class AIConfigurationManager:

@@ -96,4 +96,13 @@ class AIProviderFactory:
                 kwargs["model"] = resolved_model_id
             return cls(**kwargs)
 
+        if provider_type == "gemini":
+            return cls(
+                model=resolved_model_id or self._config.gemini_model,
+                api_key=self._config.gemini_api_key,
+                base_url=self._config.gemini_base_url,
+                temperature=self._config.temperature,
+                max_tokens=self._config.max_tokens,
+            )
+
         return cls()
