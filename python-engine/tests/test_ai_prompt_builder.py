@@ -18,7 +18,9 @@ Verifies the prompt contract produced for LLM consumption:
 """
 
 from ai.context_builder import ContextBuilder
+from ai.mode import AnalysisMode
 from ai.prompt_builder import PromptBuilder
+from ai.registries import MISSING_DATA_POLICY, REPORT_RULES, REPORT_SECTIONS
 
 SECTION_HEADINGS = [
     "SYSTEM IDENTITY",
@@ -410,3 +412,107 @@ class TestRegistryIntegrity:
         assert len(names) == len(set(names))
         assert len(combos) == len(set(combos))
         assert len(families) == len(set(families))
+
+
+# ── Report mode contract ─────────────────────────────────────────────────────
+
+
+class TestReportMode:
+    """Hardened REPORT prompt contract (registry-driven, section-enforcing)."""
+
+    @staticmethod
+    def _report_prompt():
+        return _builder().build_prompt(_full_context(), mode=AnalysisMode.REPORT)
+
+    def _contract(self):
+        prompt = self._report_prompt()
+        return prompt[prompt.index("REPORT CONTRACT"):]
+
+    def test_report_prompt_contains_contract_heading(self):
+        assert "REPORT CONTRACT" in self._report_prompt()
+
+    def test_report_mode_extends_chat_prompt_byte_identically(self):
+        """The report prompt is exactly the shared (CHAT) prompt plus the
+        REPORT CONTRACT section — CHAT stays byte-identical."""
+        pb = _builder()
+        ctx = _full_context()
+        report = pb.build_prompt(ctx, mode=AnalysisMode.REPORT)
+        chat = pb.build_prompt(ctx)
+        assert report.startswith(chat)
+        assert len(report) > len(chat)
+
+    def test_chat_prompt_has_no_report_contract(self):
+        assert "REPORT CONTRACT" not in _builder().build_prompt(_full_context())
+
+    def test_report_prompt_renders_every_registry_section_once(self):
+        contract = self._contract()
+        for section in REPORT_SECTIONS:
+            numbered_heading = f"{section.order}. {section.title}"
+            assert contract.count(numbered_heading) == 1
+
+    def test_report_prompt_sections_in_canonical_registry_order(self):
+        contract = self._contract()
+        ordered = sorted(REPORT_SECTIONS, key=lambda section: section.order)
+        positions = [contract.index(section.title) for section in ordered]
+        assert positions == sorted(positions)
+
+    def test_report_prompt_renders_all_registry_rules(self):
+        contract = self._contract()
+        for rule in REPORT_RULES:
+            assert contract.count(rule.directive) == 1
+
+    def test_report_prompt_renders_all_missing_data_policy(self):
+        contract = self._contract()
+        for message in MISSING_DATA_POLICY.values():
+            assert contract.count(message) == 1
+
+    def test_report_prompt_enforces_section_order(self):
+        contract = self._contract()
+        assert "every section listed below, in the exact order shown" in contract
+        assert "Never omit, merge, reorder, or rename a section" in contract
+        assert "never add sections that are not listed" in contract
+
+    def test_report_prompt_section_order_overrides_generic_framework(self):
+        contract = self._contract()
+        assert "the section order below overrides the generic" in contract
+        assert "REASONING FRAMEWORK" in contract
+
+    def test_report_prompt_keeps_recommendations_conditional(self):
+        contract = self._contract()
+        assert "conditional rather than absolute" in contract
+        assert "If reducing drawdown is the objective" in contract
+        assert "You should reduce your stop loss." in contract
+
+    def test_report_prompt_acknowledges_missing_data(self):
+        contract = self._contract()
+        assert "do not estimate or approximate it" in contract
+        assert "do not compare the strategy against a benchmark" in contract
+        assert "statistical confidence is limited" in contract
+        assert "never infer them" in contract
+
+    def test_report_prompt_stays_within_reasonable_size(self):
+        prompt = self._report_prompt()
+        assert MIN_REASONABLE_PROMPT_CHARS < len(prompt) < MAX_REASONABLE_PROMPT_CHARS
+
+
+class TestReportRegistryIntegrity:
+    def test_section_keys_unique(self):
+        keys = [section.key for section in REPORT_SECTIONS]
+        assert len(keys) == len(set(keys))
+
+    def test_section_orders_unique_and_contiguous(self):
+        orders = [section.order for section in REPORT_SECTIONS]
+        assert len(orders) == len(set(orders))
+        assert orders == sorted(orders)
+        assert orders == list(range(1, len(orders) + 1))
+
+    def test_sections_all_required(self):
+        for section in REPORT_SECTIONS:
+            assert section.required is True
+
+    def test_rule_ids_unique(self):
+        ids = [rule.id for rule in REPORT_RULES]
+        assert len(ids) == len(set(ids))
+
+    def test_missing_data_policy_contains_strategy_parameters(self):
+        assert "strategy_parameters" in MISSING_DATA_POLICY

@@ -5,9 +5,9 @@ is the canonical source of truth for the report's section structure,
 binding rules, missing-data guidance, and output style.
 
 It contains configuration only: it performs no prompt generation, makes
-no LLM calls, and runs no business logic. Consumers (starting with the
-Prompt Builder in a later milestone) read from this registry rather than
-embedding report structure in code.
+no LLM calls, and runs no business logic. Consumers such as the Prompt
+Builder read from this registry rather than embedding report structure
+in code.
 """
 
 from dataclasses import dataclass
@@ -157,17 +157,62 @@ REPORT_RULES: Tuple[ReportRule, ...] = (
     ReportRule("state_unavailable_information", "Clearly state when information is unavailable."),
     ReportRule("preserve_numerical_precision", "Preserve numerical precision."),
     ReportRule("avoid_contradictory_statements", "Avoid contradictory statements."),
+    ReportRule(
+        "evidence_based_reasoning",
+        "Every claim, conclusion, and recommendation must be evidence-based and "
+        "traceable to the supplied context.",
+    ),
+    ReportRule("never_contradict_context", "Never contradict the supplied context."),
+    ReportRule(
+        "consistent_headings",
+        "Keep headings consistent with the registered report section titles.",
+    ),
+    ReportRule("avoid_information_repetition", "Avoid repeating information across sections."),
+    ReportRule(
+        "conditional_recommendations",
+        "Keep recommendations conditional rather than absolute. Preferred: "
+        "'If reducing drawdown is the objective, consider evaluating stricter exit "
+        "rules.' Avoid: 'You should reduce your stop loss.'",
+    ),
+    ReportRule(
+        "acknowledge_uncertainty",
+        "Acknowledge uncertainty whenever information is missing, and never appear "
+        "more confident than the supplied data supports.",
+    ),
+    ReportRule(
+        "deterministic_language",
+        "Use deterministic language: plain, neutral phrasing with consistent "
+        "terminology and no vague or inflated claims.",
+    ),
+    ReportRule(
+        "professional_markdown",
+        "Produce professional markdown: well-structured, concise, and without filler.",
+    ),
 )
 
 
-METRIC_NOT_AVAILABLE_MSG = "Metric not available in supplied context."
-BENCHMARK_NOT_AVAILABLE_MSG = "Benchmark comparison unavailable."
-INSUFFICIENT_TRADES_MSG = "Insufficient trade count; statistical confidence is limited."
+METRIC_NOT_AVAILABLE_MSG = (
+    "If a required metric is absent from the injected context, do not estimate or "
+    "approximate it; state clearly that the metric is unavailable."
+)
+BENCHMARK_NOT_AVAILABLE_MSG = (
+    "If benchmark data is absent, do not compare the strategy against a benchmark; "
+    "state clearly that a benchmark comparison is unavailable."
+)
+INSUFFICIENT_TRADES_MSG = (
+    "If the trade count is insufficient to support reliable statistics, explicitly "
+    "state that statistical confidence is limited."
+)
+STRATEGY_PARAMETERS_NOT_AVAILABLE_MSG = (
+    "If strategy parameters are missing, never infer them; state clearly that they "
+    "are unavailable."
+)
 
 MISSING_DATA_POLICY: Dict[str, str] = {
     "metric": METRIC_NOT_AVAILABLE_MSG,
     "benchmark": BENCHMARK_NOT_AVAILABLE_MSG,
     "insufficient_trades": INSUFFICIENT_TRADES_MSG,
+    "strategy_parameters": STRATEGY_PARAMETERS_NOT_AVAILABLE_MSG,
 }
 
 

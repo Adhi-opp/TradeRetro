@@ -22,6 +22,7 @@ import copy
 from typing import Any, Dict, Optional
 
 from ai.mode import AnalysisMode
+from ai.registries import MISSING_DATA_POLICY, REPORT_RULES, REPORT_SECTIONS, REPORT_STYLE
 
 
 class PromptBuilder:
@@ -756,17 +757,115 @@ class PromptBuilder:
     def _build_report_prompt(self, context: Optional[Dict[str, Any]]) -> str:
         """Builds the structured report prompt.
 
+        The report prompt reuses the shared seven-section template and
+        appends the Report Registry contract as a dedicated section,
+        keeping the registry the single source of truth for report
+        structure, rules, missing-data guidance, and style.
+
         Args:
             context: A context dictionary produced by ContextBuilder v2.
 
         Returns:
-            Complete assembled prompt string ready for LLM inference.
-
-        Note:
-            Report-specific prompting will be implemented in a later
-            milestone; for now report mode reuses the shared template.
+            Complete assembled report prompt string ready for LLM inference.
         """
-        return self._build_shared_prompt(context)
+        base = self._build_shared_prompt(context)
+        contract = self._section("REPORT CONTRACT", self._build_report_contract())
+        return f"{base}\n\n{contract}"
+
+    def _build_report_contract(self) -> str:
+        """Assembles the report contract body from the Report Registry.
+
+        Section definitions, ordering, binding rules, missing-data policy,
+        and style settings are all consumed from the registry; none of them
+        are hardcoded here. The enforcement prose is the only content the
+        builder contributes — it frames the registry contract but never
+        restates it.
+
+        Returns:
+            Formatted report contract body (without the section heading).
+        """
+        return (
+            "Report output requirements:\n\n"
+            "Generate the report as a single professional markdown document "
+            "containing every section listed below, in the exact order shown. "
+            "Use each section title verbatim as its heading and cover the "
+            "content its description defines. Never omit, merge, reorder, or "
+            "rename a section, and never add sections that are not listed. For "
+            "this report, the section order below overrides the generic "
+            "REASONING FRAMEWORK shown earlier in this prompt.\n\n"
+            f"{self._render_report_sections()}\n\n"
+            "Binding rules:\n\n"
+            "The rules below apply to every part of the report without "
+            "exception:\n\n"
+            f"{self._render_report_rules()}\n\n"
+            "Missing data:\n\n"
+            "The injected context is the only source of report facts. Whenever "
+            "information required by the report is missing from the context, "
+            "acknowledge the gap explicitly; never compensate by estimating, "
+            "inferring, or borrowing values from outside the context:\n\n"
+            f"{self._render_report_missing_data()}\n\n"
+            "Report style:\n\n"
+            "Write the report in the style below, keeping phrasing and "
+            "terminology consistent throughout:\n\n"
+            f"{self._render_report_style()}"
+        )
+
+    def _render_report_sections(self) -> str:
+        """Renders the canonical section order from the registry.
+
+        Sections are emitted sorted by their ``order`` field so the rendered
+        sequence always matches the registry, regardless of tuple order.
+
+        Returns:
+            Numbered list of report section titles, purpose, required flag,
+            and content definition.
+        """
+        sections = sorted(REPORT_SECTIONS, key=lambda section: section.order)
+        return "\n".join(
+            (
+                f"{section.order}. {section.title} "
+                f"({'Required' if section.required else 'Optional'}): "
+                f"{section.purpose} Content: {section.description}"
+            )
+            for section in sections
+        )
+
+    def _render_report_rules(self) -> str:
+        """Renders the binding report rules from the registry.
+
+        Returns:
+            Bulleted list of report rule directives.
+        """
+        return "\n".join(f"- {rule.directive}" for rule in REPORT_RULES)
+
+    def _render_report_missing_data(self) -> str:
+        """Renders the missing-data guidance from the registry.
+
+        Returns:
+            Bulleted list of reusable missing-data statements.
+        """
+        return "\n".join(
+            f"- {message}" for message in MISSING_DATA_POLICY.values()
+        )
+
+    def _render_report_style(self) -> str:
+        """Renders the configured report style from the registry.
+
+        Returns:
+            Formatted report style configuration lines.
+        """
+        style = REPORT_STYLE
+        return "\n".join(
+            (
+                f"- Tone: {style.tone}",
+                f"- Institutional style: {'yes' if style.institutional else 'no'}",
+                f"- Reasoning standard: {style.reasoning}",
+                f"- Headings: {style.headings}",
+                f"- Output format: {style.formatting}",
+                f"- Emojis: {'yes' if style.emojis else 'no'}",
+                f"- Language: {style.language}",
+            )
+        )
 
     def _build_shared_prompt(self, context: Optional[Dict[str, Any]]) -> str:
         """Assembles the shared prompt template from the seven logical
