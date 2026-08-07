@@ -8,13 +8,10 @@ Configuration for the AI Copilot is largely self-contained within `python-engine
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | `bool` | `True` | Master toggle for the AI Copilot |
-| `provider` | `str` | `"openai-compatible"` | Default provider backend identifier |
 | `model` | `str` | `"qwen2.5-coder-1.5b-instruct"` | Default model ID sent to the provider |
-| `temperature` | `float` | `0.2` | LLM sampling temperature (0.0–2.0); configured default, not yet delivered to providers |
-| `max_tokens` | `int` | `1024` | Maximum tokens in the generated response; configured default, not yet delivered to providers |
+| `temperature` | `float` | `0.2` | LLM sampling temperature (0.0–2.0); delivered to provider payloads via `AIProviderFactory` |
+| `max_tokens` | `int` | `1024` | Maximum tokens in the generated response; delivered to provider payloads via `AIProviderFactory` |
 | `timeout_seconds` | `int` | `30` | Reserved; providers use their own internal timeouts (see below) |
-| `debug` | `bool` | `False` | Enable debug-level logging |
 | `openai_compatible_base_url` | `str` | `"http://localhost:1234"` | Base URL for openai-compatible provider |
 | `openai_compatible_api_key` | `str` | `"not-needed"` | API key for openai-compatible provider |
 | `gemini_api_key` | `str` | `""` | Google Gemini API key; defaults to the `GEMINI_API_KEY` env var |
@@ -28,7 +25,6 @@ Configuration for the AI Copilot is largely self-contained within `python-engine
 | Method | Description | Validation |
 |---|---|---|
 | `get_config()` | Returns current `AIConfig` instance | — |
-| `set_provider(name)` | Changes active provider | — |
 | `set_temperature(value)` | Sets temperature | Raises `ValueError` if not in `[0.0, 2.0]` |
 | `set_max_tokens(value)` | Sets max tokens | Raises `ValueError` if ≤ 0 |
 | `reset_defaults()` | Restores factory defaults | — |
@@ -40,7 +36,7 @@ The provider is selected at runtime by `AIProviderFactory.get_provider()`. The i
 1. **A model ID** (e.g., `"qwen2.5-coder-1.5b-instruct"`) — looked up in the registry to find the provider type
 2. **A provider name** (e.g., `"mock"`, `"ollama"`) — used directly if not found in the registry
 
-The `openai-compatible` and `gemini` providers are wired with their connection details from `AIConfig` — the openai-compatible provider receives `model`, `base_url`, and `api_key`; the gemini provider receives `model`, `api_key`, and `base_url`. All other providers are instantiated with no arguments (they use their own hardcoded defaults). This avoids coupling every provider to the same configuration schema — Ollama doesn't need an API key, and the mock provider doesn't need a base URL.
+The providers are wired from `AIConfig` by `AIProviderFactory` — the openai-compatible provider receives `model`, `base_url`, `api_key`, `temperature`, and `max_tokens`; the gemini provider receives `model`, `api_key`, `base_url`, `temperature`, and `max_tokens`; the ollama provider receives `temperature` and `max_tokens` (plus the resolved model ID when one is found in the registry). Only the mock and OpenAI-stub providers are instantiated with no arguments (they use their own hardcoded defaults). This keeps connection details and generation settings in one place — Ollama doesn't need an API key, and the mock provider doesn't need a base URL.
 
 ## Model Configuration
 
@@ -83,10 +79,9 @@ hardware can be slow, especially for longer generations. `OllamaProvider` uses
 60s. These are internal defaults in the provider classes, not in `AIConfig`.
 
 Similarly, `AIConfig.temperature` (0.2) and `AIConfig.max_tokens` (1024) are
-**configured defaults but are not yet delivered to any provider** — provider
-payloads send only `model`, `messages`, and `stream`. Wiring these values
-through the provider interface is planned work; until then they serve as the
-documented project defaults.
+**delivered to every provider** by `AIProviderFactory`: openai-compatible and
+gemini include them in the request payload, and ollama forwards them via the
+`options` block. They are the operative generation settings, not placeholders.
 
 ### What's Next
 

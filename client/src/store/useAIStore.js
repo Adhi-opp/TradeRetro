@@ -35,6 +35,8 @@ const useAIStore = create((set, get) => ({
   messages: [],
   loading: false,
   error: null,
+  inputValue: '',
+  focusRequest: 0,
 
   models: [],
   selectedModel: null,
@@ -57,6 +59,11 @@ const useAIStore = create((set, get) => ({
   setError: (error) => set({ error }),
 
   clearConversation: () => set({ messages: [], error: null }),
+
+  setInputValue: (text) => set({ inputValue: text || '' }),
+
+  setDraftPrompt: (text) =>
+    set((s) => ({ inputValue: (text || '').trim(), focusRequest: s.focusRequest + 1 })),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
 

@@ -1,24 +1,32 @@
-const actions = [
-  { label: 'Explain Strategy', description: 'Get a plain-English breakdown of any strategy' },
-  { label: 'Generate Backtest Summary', description: 'Summarize the latest backtest results' },
-  { label: 'Explain Metrics', description: 'Understand what each metric means' },
-  { label: 'Improve Strategy', description: 'Suggest optimizations for your strategy' },
-];
+import { useCallback } from 'react';
+import useAIStore from '../../store/useAIStore';
+import useBacktestStore from '../../store/useBacktestStore';
+import { QUICK_ACTIONS, buildQuickActionPrompt } from '../../services/promptTemplates';
 
 export default function QuickActions() {
+  const setDraftPrompt = useAIStore((s) => s.setDraftPrompt);
+
+  const handleAction = useCallback(
+    (action) => {
+      const backtestState = useBacktestStore.getState();
+      setDraftPrompt(buildQuickActionPrompt(action, backtestState));
+    },
+    [setDraftPrompt],
+  );
+
   return (
     <section className="ai-quick-actions" aria-label="Quick actions">
       <div className="ai-qa-grid">
-        {actions.map(({ label, description }) => (
+        {QUICK_ACTIONS.map((action) => (
           <button
-            key={label}
+            key={action.id}
             className="ai-qa-card"
-            disabled
-            title={description}
-            aria-label={description}
+            onClick={() => handleAction(action)}
+            title={action.description}
+            aria-label={action.description}
           >
-            <span className="ai-qa-label">{label}</span>
-            <span className="ai-qa-desc">{description}</span>
+            <span className="ai-qa-label">{action.label}</span>
+            <span className="ai-qa-desc">{action.description}</span>
           </button>
         ))}
       </div>

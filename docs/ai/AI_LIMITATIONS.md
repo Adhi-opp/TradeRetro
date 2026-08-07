@@ -53,7 +53,7 @@ The following limitations apply to the current implementation. These are known c
 
 | Limitation | Description |
 |---|---|
-| **No Model Selection UI** | Copilot requests use the server default model (`qwen2.5-coder-1.5b-instruct`). The settings button in the Copilot header is present but disabled — there is no model dropdown or provider picker yet. |
+| **Settings Button Disabled** | The settings button in the Copilot header is present but disabled — it cannot be used to change provider/model. Model selection is handled by the model dropdown in the Copilot header (populated from `GET /api/ai/models`), and the selected model is sent as `provider_name` on generate requests. |
 | **In-Memory Conversation Only** | The conversation is held in the client-side Zustand store and is lost on page reload. There is no persistence and no server-side conversation memory. |
 | **Quick Actions Disabled** | The quick-action cards in the Copilot panel are visual placeholders and are not yet wired to send prompts. |
 

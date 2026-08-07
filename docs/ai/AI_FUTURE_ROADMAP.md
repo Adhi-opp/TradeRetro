@@ -11,7 +11,7 @@ This document describes completed milestones and planned improvements to the AI 
 - ✅ Automatic context injection — live backtest state is attached to every Copilot request via `aiContextBuilder.js`
 
 ### Automated Tests
-- ✅ Comprehensive AI test suite: 169 AI tests across the router, service, context builder, prompt builder, providers, and provider factory (279 tests in the full suite)
+- ✅ Comprehensive AI test suite: 229 AI tests across the router, service, config, context builder, prompt builder, providers, and provider factory (339 tests in the full suite)
 - ✅ Coverage for error paths (connection refused, timeout, unknown provider, validation errors)
 
 ### Cloud Providers
@@ -20,9 +20,9 @@ This document describes completed milestones and planned improvements to the AI 
 ## Short-Term (Next 1–2 Milestones)
 
 ### Model Selection UI
-- Add a model dropdown to the Copilot panel populated from `GET /api/ai/models`
+- ✅ Model dropdown in the Copilot panel, populated from `GET /api/ai/models` (`ModelSelector`)
+- ✅ Selected model sent via `provider_name` on generate requests
 - Enable the currently disabled settings button to pick provider/model
-- Allow the selected model to be sent via `provider_name` on generate requests
 
 ### Streaming Support
 - Implement Server-Sent Events (SSE) for token-by-token streaming

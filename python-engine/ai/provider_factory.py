@@ -14,7 +14,7 @@ from ai.providers.gemini_provider import GeminiProvider
 from ai.providers.mock_provider import MockLLMProvider
 from ai.providers.openai_compatible_provider import OpenAICompatibleProvider
 from ai.providers.openai_provider import OpenAIProvider
-from ai.registry import REGISTERED_MODELS, resolve_model
+from ai.registry import resolve_model
 
 
 class AIProviderFactory:

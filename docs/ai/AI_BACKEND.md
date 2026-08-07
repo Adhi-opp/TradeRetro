@@ -42,20 +42,17 @@ Houses `AIConfig` (a plain `@dataclass`) and `AIConfigurationManager` for valida
 
 | Field | Default | Note |
 |---|---|---|
-| `enabled` | `True` | Master toggle |
-| `provider` | `"openai-compatible"` | Default backend |
 | `model` | `"qwen2.5-coder-1.5b-instruct"` | Default model ID |
-| `temperature` | `0.2` | Sampler temperature (configured default; not currently passed to providers) |
-| `max_tokens` | `1024` | Max response tokens (configured default; not currently passed to providers) |
+| `temperature` | `0.2` | Sampler temperature (delivered to provider payloads via `AIProviderFactory`) |
+| `max_tokens` | `1024` | Max response tokens (delivered to provider payloads via `AIProviderFactory`) |
 | `timeout_seconds` | `30` | Reserved; providers use their own internal timeouts (`OpenAICompatibleProvider` 120s, `OllamaProvider` 60s, `GeminiProvider` 60s) |
-| `debug` | `False` | Debug logging |
 | `openai_compatible_base_url` | `"http://localhost:1234"` | LM Studio default |
 | `openai_compatible_api_key` | `"not-needed"` | Local servers rarely need auth |
 | `gemini_api_key` | `""` | Gemini API key; defaults to `GEMINI_API_KEY` env var |
 | `gemini_model` | `"gemini-3.6-flash"` | Gemini model ID; defaults to `GEMINI_MODEL` env var |
 | `gemini_base_url` | `"https://generativelanguage.googleapis.com"` | Gemini API base URL; defaults to `GEMINI_BASE_URL` env var |
 
-`AIConfigurationManager` wraps the dataclass with validation: temperature is clamped to `[0.0, 2.0]`, `max_tokens` must be positive. `reset_defaults()` restores factory state.
+`AIConfigurationManager` wraps the dataclass with validation: a temperature outside `[0.0, 2.0]` raises `ValueError`, and `max_tokens` must be positive. `reset_defaults()` restores factory state.
 
 AI configuration is intentionally self-contained. The Gemini fields also support environment variable overrides (`GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_BASE_URL`); other fields require code changes for different environments.
 
@@ -151,9 +148,10 @@ Resolves a model ID or provider name to a `BaseLLMProvider` instance. Resolution
 
 1. Look up the key in `registry.resolve_model()` → get provider type + model ID
 2. If not found in the registry, treat the key as a direct provider name
-3. For `"openai-compatible"`, pass `model`, `base_url`, `api_key` from `AIConfig`
-4. For all others, instantiate with no arguments
-5. `ValueError` if the provider type isn't in `_provider_classes`
+3. For `"openai-compatible"`, pass `model`, `base_url`, `api_key`, `temperature`, and `max_tokens` from `AIConfig`
+4. For `"ollama"`, pass `temperature` and `max_tokens` (plus the resolved model ID when one is found); for `"gemini"`, pass `model`, `api_key`, `base_url`, `temperature`, and `max_tokens`
+5. Only the mock and OpenAI-stub providers are instantiated with no arguments
+6. `ValueError` if the provider type isn't in `_provider_classes`
 
 ```python
 _provider_classes = {

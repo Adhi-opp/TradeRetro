@@ -2,6 +2,17 @@
 
 All notable changes to the TradeRetro AI Copilot module.
 
+## 1.2.1 (2026-08-08)
+
+Release polish: model selection UI, environment variable configuration, and expanded test coverage.
+
+### Added
+
+- **Model Selection UI** — `client/src/components/copilot/ModelSelector.jsx` adds a model dropdown to the Copilot header, populated from `GET /api/ai/models`. The selected model is persisted in the Zustand store and sent as `provider_name` on generate requests, overriding the server default. `CopilotHeader` restyled to host the selector.
+- **Environment Variable Configuration** — `ai/config.py` now loads `.env` best-effort (via `python-dotenv` when installed; import failure is silently ignored). `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL` overrides are applied when `AIConfig` is constructed.
+- **Tests** — `test_ai_config.py` added for env-var overrides and `AIConfigurationManager` validation; provider and factory suites expanded. The AI suite now stands at **229 tests across 7 files**.
+- **Documentation** — Registry, configuration, testing, limitations, roadmap, and changelog docs synchronized with the current implementation.
+
 ## 1.2.0 (2026-08-07)
 
 This release replaces the Gemini stub with a production-ready Gemini provider.
@@ -11,9 +22,10 @@ This release replaces the Gemini stub with a production-ready Gemini provider.
 - **GeminiProvider** — `ai/providers/gemini_provider.py` now calls Google's Gemini `generateContent` REST API, targeting the current recommended Gemini Flash model `gemini-3.6-flash`. Structured error handling covers missing API key, authentication failure (HTTP 401/403), model not found, connection refused, timeout, no candidates, and empty text. Token tracking via `usageMetadata`.
 - **Gemini Configuration** — `AIConfig` gains `gemini_api_key`, `gemini_model`, and `gemini_base_url`, each defaulting to the `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL` environment variables (loadable from `.env`).
 - **Factory Wiring** — `AIProviderFactory` resolves Gemini exactly like the other providers, passing model, api key, and base URL from `AIConfig`.
-- **Registry** — `gemini-3.6-flash` (display name "Gemini Flash") registered as a `gemini` provider entry (14 static entries total). Frontend only sees display names.
+- **Registry** — `gemini-3.6-flash` (display name "Gemini Flash") registered as a `gemini` provider entry (13 static entries total). Frontend only sees display names.
 - **Environment Template** — `.env.example` documents `GEMINI_API_KEY`, `GEMINI_MODEL`, and `GEMINI_BASE_URL`.
-- **Tests** — Gemini provider tests covering success, authentication failure, timeout, malformed response, provider unavailable, and empty/missing API key; factory wiring and config env-override tests. Full backend suite now at 339 tests.
+- **REPORT Mode & Report Registry** — Analysis mode infrastructure (`ai/mode.py`) plus a report registry for structured analysis; prompt builder hardened with report-mode section generation for `MODE_REPORT` requests.
+- **Tests** — Gemini provider tests covering success, authentication failure, timeout, malformed response, provider unavailable, and empty/missing API key; factory wiring and config env-override tests. Full backend suite now at 339 collected tests.
 
 ### Changed
 
@@ -21,7 +33,7 @@ This release replaces the Gemini stub with a production-ready Gemini provider.
 
 ### Unchanged
 
-- `PromptBuilder`, `ContextBuilder`, report registry, router, `AIService` architecture, and the OpenAI stub are untouched. No streaming, memory, tool calling, images, voice, agents, RAG, new endpoints, or new UI.
+- `ContextBuilder`, the router, and `AIService` architecture are unchanged; the OpenAI stub is untouched. No streaming, memory, tool calling, images, voice, agents, RAG, new endpoints, or new UI.
 
 ## 1.1.0 (2026-08-06)
 

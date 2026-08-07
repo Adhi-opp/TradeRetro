@@ -242,7 +242,7 @@ Three techniques are used:
 
 - **Why low?** Trading analysis requires precision, consistency, and factual accuracy — not creative writing. Low temperature reduces the probability of hallucination and produces more deterministic outputs.
 - **Range allowed:** 0.0–2.0, validated by `AIConfigurationManager.set_temperature()`.
-- **Note:** the value is currently reserved — provider payloads do not yet include it (see [AI_CONFIGURATION.md](AI_CONFIGURATION.md)). It remains the documented project default for when wiring lands.
+- **Delivery:** the value is included in provider payloads by `AIProviderFactory` (see [AI_CONFIGURATION.md](AI_CONFIGURATION.md)).
 
 ## Prompt Flow
 

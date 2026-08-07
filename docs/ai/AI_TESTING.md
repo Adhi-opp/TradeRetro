@@ -1,8 +1,8 @@
 # AI Testing Guide
 
-## Test Report — v1.1.0
+## Test Report — v1.2.1
 
-The AI module has a dedicated automated test suite. The full backend suite stands at **279 tests**, of which **169 cover the AI module** across six files:
+The AI module has a dedicated automated test suite. The full backend suite stands at **339 tests**, of which **229 cover the AI module** across seven files:
 
 | File | Scope |
 |---|---|
@@ -12,6 +12,7 @@ The AI module has a dedicated automated test suite. The full backend suite stand
 | `test_ai_prompt_builder.py` | 7-section prompt structure, ordering, determinism, reasoning registries, legacy `build()` wrapper |
 | `test_ai_providers.py` | Mock, OpenAI-compatible, Ollama, and Gemini providers plus the OpenAI stub, including all error paths |
 | `test_ai_provider_factory.py` | Provider resolution, registry fallback, openai-compatible wiring, legacy `LLMProviderFactory` |
+| `test_ai_config.py` | `AIConfig` Gemini env-var overrides, `AIConfigurationManager` validation setters, `reset_defaults()` |
 
 This document also serves as a manual testing reference for live provider verification.
 
@@ -298,14 +299,14 @@ The AI suite is organized by module layer so a failure pinpoints the responsible
 
 ## Running Tests
 
-To run the full backend suite (279 tests):
+To run the full backend suite (339 tests):
 
 ```bash
 cd python-engine
 pytest tests/ -v
 ```
 
-To run only the AI suite (169 tests):
+To run only the AI suite (229 tests):
 
 ```bash
 cd python-engine

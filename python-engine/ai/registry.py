@@ -6,7 +6,7 @@ optionally discover locally installed Ollama models at runtime.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List
 
 logger = logging.getLogger("traderetro.ai.registry")
