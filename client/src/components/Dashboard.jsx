@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Bot, Menu, X, Pin, PinOff, Bell, Search } from 'lucide-react';
+import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Bot, Menu, X, Pin, PinOff } from 'lucide-react';
 import ControlBar from './ControlBar';
 import StrategyConfig from './StrategyConfig';
 import TearsheetGrid from './TearsheetGrid';
@@ -187,13 +187,6 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
               <span className="current-page-label">{activePage.title}</span>
             </div>
           </div>
-          <div className="app-bar-center">
-            <div className="global-search-container">
-              <Search size={14} />
-              <input type="text" placeholder="Search terminal or commands (Ctrl + K)..." disabled />
-              <span className="search-shortcut">⌘K</span>
-            </div>
-          </div>
           <div className="app-bar-right">
             <MarketClock />
             <div className="sync-indicator">
@@ -203,12 +196,6 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
             <button className="theme-toggle" onClick={onToggleTheme} title="Toggle theme">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-            <button className="notification-btn" title="Notifications">
-              <Bell size={15} />
-            </button>
-            <div className="user-avatar" title="User Profile">
-              <span>TR</span>
-            </div>
           </div>
         </header>
 
