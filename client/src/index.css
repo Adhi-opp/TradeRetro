@@ -45,6 +45,9 @@
   --gold:     #f0c040;
   --purple:   #9b72e0;
   --orange:   #f07850;
+  --accent:   #00c9a7;
+  --surface:  #1a1d1f;
+  --surface-alt: rgba(255,255,255,0.04);
 
   /* Typography Variables */
   --font-display: 48px;
@@ -109,23 +112,26 @@
 /* ── Light Theme ─────────────────────────────────────────── */
 
 [data-theme="light"] {
-  --bg-root:      #f6f7f6;
+  --bg-primary:   #eef1f5;
+  --bg-secondary: #ffffff;
+  --bg-root:      #eef1f5;
   --bg-panel:     #ffffff;
-  --bg-input:     #eef1ef;
-  --bg-hover:     #e4e8e5;
-  --bg-elevated:  #dce2de;
-  --border:       #d1d9d4;
-  --border-soft:  #e3e8e4;
-  --border-focus: #00a888;
+  --bg-input:     #f3f5f8;
+  --bg-hover:     #e9edf2;
+  --bg-elevated:  #ffffff;
+  --border:       #d5dbe4;
+  --border-soft:  #e4e9ef;
+  --card-border:  #d5dbe4;
+  --border-focus: #d97706;
 
-  --text-primary:   #1a2420;
-  --text-secondary: #4a5551;
-  --text-muted:     #7a8581;
+  --text-primary:   #14181f;
+  --text-secondary: #4a5565;
+  --text-muted:     #6b7280;
 
-  --primary:        #00a888;
-  --primary-hover:  #008870;
-  --primary-bg:     rgba(0,168,136,.10);
-  --primary-highlight:#d7f0e8;
+  --primary:        #d97706;
+  --primary-hover:  #b45309;
+  --primary-bg:     rgba(217,119,6,.10);
+  --primary-highlight:#fdeccb;
 
   --green:    #16a34a;
   --green-bg: rgba(22,163,74,.08);
@@ -145,6 +151,9 @@
   --gold:     #c89600;
   --purple:   #7e56c4;
   --orange:   #d96040;
+  --accent:   #d97706;
+  --surface:  #f7f9fb;
+  --surface-alt: rgba(20, 30, 48, 0.05);
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -7754,6 +7763,67 @@ body {
   --font-card-title: 14px;
   --font-body: 14px;
   --font-caption: 12px;
+
+  /* Surface/state tokens (dark values = previous literals, unchanged) */
+  --ds-chip-bg: rgba(255,255,255,.04);
+  --ds-row-hover: rgba(255,255,255,.035);
+  --ds-soft-bg: rgba(255,255,255,.03);
+  --ds-soft-bg-2: rgba(255,255,255,.05);
+  --ds-skeleton-grad: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.09), rgba(255,255,255,.04));
+  --ds-overlay-shadow: 0 24px 80px rgba(0,0,0,.48);
+  --ds-sidebar-shadow: 16px 0 36px rgba(0,0,0,.28);
+  --ds-error-text: #fecaca;
+  --ds-cyan: #22d3ee;
+  --ds-hero-grad: linear-gradient(135deg, var(--ds-surface-2), #090a0f);
+  --ds-engine-grad: linear-gradient(180deg, rgba(17,20,26,.98), rgba(10,11,15,.98));
+
+  /* Chart UI tokens (dark values preserved) */
+  --chart-axis: #475569;
+  --chart-grid: #1e2736;
+}
+
+/* ── Light Theme: V2 Design System overrides ───────────────────
+   The --ds-* layer is dark-first; this block re-skins the exact
+   same tokens for [data-theme="light"] so every var(--ds-*) rule
+   resolves to the light palette without duplicating rules.      */
+[data-theme="light"] {
+  --ds-bg: #eef1f5;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f7f9fb;
+  --ds-surface-3: #f3f5f8;
+  --ds-border: rgba(20, 30, 48, .14);
+  --ds-border-strong: rgba(20, 30, 48, .26);
+  --ds-text: #14181f;
+  --ds-text-2: #42526b;
+  --ds-text-3: #5f6b7e;
+  --ds-accent: #d97706;
+  --ds-accent-2: #b45309;
+  --ds-green: #047857;
+  --ds-red: #dc2626;
+  --ds-blue: #0369a1;
+  --ds-radius: 8px;
+  --ds-radius-sm: 6px;
+  --ds-shadow: 0 14px 34px rgba(30, 40, 60, .10);
+  --ds-shadow-hover: 0 18px 42px rgba(30, 40, 60, .16);
+  --ds-control-h: 48px;
+  --ds-card-pad: 16px;
+  --ds-section-gap: 16px;
+
+  /* State tokens (light equivalents) */
+  --ds-chip-bg: rgba(15,23,42,.045);
+  --ds-row-hover: rgba(64,84,110,.065);
+  --ds-soft-bg: rgba(15,23,42,.04);
+  --ds-soft-bg-2: rgba(15,23,42,.05);
+  --ds-skeleton-grad: linear-gradient(90deg, rgba(15,23,42,.05), rgba(15,23,42,.10), rgba(15,23,42,.05));
+  --ds-overlay-shadow: 0 18px 48px rgba(15,23,42,.22);
+  --ds-sidebar-shadow: 16px 0 36px rgba(15,23,42,.14);
+  --ds-hero-grad: linear-gradient(135deg, var(--ds-surface-2), #e1e7ee);
+  --ds-engine-grad: linear-gradient(180deg, #ffffff, #f2f5f8);
+  --ds-error-text: #b91c1c;
+  --ds-cyan: #0e7490;
+
+  --chart-axis: #6b7a90;
+  --chart-grid: #dde4ec;
 }
 
 body {
@@ -7946,7 +8016,7 @@ button:disabled {
   padding: 0 8px !important;
   border: 1px solid var(--ds-border) !important;
   border-radius: 999px !important;
-  background: rgba(255,255,255,.04) !important;
+  background: var(--ds-chip-bg) !important;
   color: var(--ds-text-2) !important;
   font-size: 11px !important;
   font-weight: 720 !important;
@@ -7985,7 +8055,7 @@ th,
 }
 
 tbody tr:hover {
-  background: rgba(255,255,255,.035) !important;
+  background: var(--ds-row-hover) !important;
 }
 
 .drawer-content,
@@ -7995,7 +8065,7 @@ tbody tr:hover {
   border-radius: var(--ds-radius) !important;
   border: 1px solid var(--ds-border) !important;
   background: var(--ds-surface) !important;
-  box-shadow: 0 24px 80px rgba(0,0,0,.48) !important;
+  box-shadow: var(--ds-overlay-shadow) !important;
 }
 
 .app-shell-v2 .view-container {
@@ -8009,7 +8079,7 @@ tbody tr:hover {
 .app-shell-v2 .hero-header-section {
   min-height: 88px !important;
   padding: 18px 24px !important;
-  background: linear-gradient(135deg, var(--ds-surface-2), #0a0b0f) !important;
+  background: var(--ds-hero-grad) !important;
   border: 1px solid var(--ds-border) !important;
   box-shadow: none !important;
 }
@@ -8021,7 +8091,7 @@ tbody tr:hover {
   padding: 16px !important;
   border: 1px solid var(--ds-border) !important;
   border-radius: var(--ds-radius) !important;
-  background: linear-gradient(180deg, rgba(17,20,26,.98), rgba(10,11,15,.98)) !important;
+  background: var(--ds-engine-grad) !important;
   box-shadow: var(--ds-shadow) !important;
 }
 
@@ -8157,7 +8227,7 @@ tbody tr:hover {
   border: 1px solid var(--ds-border) !important;
   border-radius: var(--ds-radius) !important;
   color: var(--ds-text-2) !important;
-  background: rgba(255,255,255,.03) !important;
+  background: var(--ds-soft-bg) !important;
   font-size: 13px !important;
   font-weight: 700 !important;
 }
@@ -8342,7 +8412,7 @@ tbody tr:hover {
   width: var(--shell-sidebar-expanded) !important;
   flex-basis: var(--shell-sidebar-expanded) !important;
   padding-inline: 12px !important;
-  box-shadow: 16px 0 36px rgba(0, 0, 0, .28) !important;
+  box-shadow: var(--ds-sidebar-shadow) !important;
 }
 
 .app-shell-v2 .sidebar-brand {
@@ -9017,7 +9087,7 @@ html, body, #root {
   gap: 16px !important;
   border: 1px solid var(--ds-border) !important;
   border-radius: var(--ds-radius) !important;
-  background: linear-gradient(135deg, var(--ds-surface-2), #090a0f) !important;
+  background: var(--ds-hero-grad) !important;
 }
 
 .ca-hero h1,
@@ -9072,7 +9142,7 @@ html, body, #root {
   gap: 8px !important;
   border: 1px dashed var(--ds-border) !important;
   border-radius: var(--ds-radius) !important;
-  background: rgba(255,255,255,.025) !important;
+  background: var(--ds-soft-bg) !important;
   color: var(--ds-text-2) !important;
   text-align: center !important;
 }
@@ -9081,7 +9151,7 @@ html, body, #root {
 .dq-state-error {
   border-color: rgba(239,68,68,.28) !important;
   background: rgba(239,68,68,.07) !important;
-  color: #fecaca !important;
+  color: var(--ds-error-text) !important;
 }
 
 .chip,
@@ -9192,7 +9262,7 @@ html, body, #root {
 }
 
 .infra-live-chip.muted {
-  background: rgba(255,255,255,.05) !important;
+  background: var(--ds-soft-bg-2) !important;
   color: var(--ds-text-3) !important;
 }
 
@@ -9228,7 +9298,7 @@ html, body, #root {
   padding: 0 12px !important;
   border: 1px solid var(--ds-border) !important;
   border-radius: var(--ds-radius-sm) !important;
-  background: rgba(255,255,255,.025) !important;
+  background: var(--ds-soft-bg) !important;
 }
 
 .infra-status-list strong {
@@ -9292,7 +9362,7 @@ html, body, #root {
 
 .dq-stat-value {
   margin: 10px 0 !important;
-  color: #22d3ee !important;
+  color: var(--ds-cyan) !important;
   font-size: 24px !important;
   font-weight: 780 !important;
 }
@@ -9317,7 +9387,7 @@ html, body, #root {
   border: 1px solid rgba(239,68,68,.28) !important;
   border-radius: var(--ds-radius) !important;
   background: rgba(239,68,68,.07) !important;
-  color: #fecaca !important;
+  color: var(--ds-error-text) !important;
 }
 
 .dq-error-panel strong {
@@ -9408,7 +9478,7 @@ html, body, #root {
 .dq-table-skeleton span {
   height: 36px !important;
   border-radius: var(--ds-radius-sm) !important;
-  background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.09), rgba(255,255,255,.04)) !important;
+  background: var(--ds-skeleton-grad) !important;
   background-size: 220% 100% !important;
   animation: shimmer 1.4s ease-in-out infinite !important;
 }
@@ -10144,7 +10214,7 @@ html, body, #root {
 }
 
 [data-theme="light"] .ai-message-user .ai-message-body {
-  border-color: rgba(0, 168, 136, 0.2);
+  border-color: rgba(217, 119, 6, 0.22);
 }
 
 .ai-message-assistant .ai-message-body {
@@ -10347,7 +10417,7 @@ html, body, #root {
 }
 
 [data-theme="light"] .ai-md-inline-code {
-  background: rgba(0, 168, 136, 0.08);
+  background: rgba(217, 119, 6, 0.10);
   color: var(--primary);
 }
 
@@ -10457,7 +10527,7 @@ html, body, #root {
 }
 
 [data-theme="light"] .ai-md-table tbody tr:hover {
-  background: rgba(0, 168, 136, 0.04);
+  background: rgba(217, 119, 6, 0.05);
 }
 
 .ai-md-table tbody tr:last-child td {
@@ -10579,4 +10649,478 @@ html, body, #root {
   .ai-panel-body {
     padding-bottom: 80px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIGHT THEME — LEGACY HARD-CODED DARK CORRECTIONS
+   Corrective overrides for pre-token rules that hard-coded dark
+   colors. All rules here are scoped to [data-theme="light"]; the
+   dark theme is untouched by this section.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Engine shell backgrounds that were hard-coded near-black */
+[data-theme="light"] .backtest-shell,
+[data-theme="light"] .backtest-body {
+  background: var(--ds-bg) !important;
+}
+
+[data-theme="light"] .backtest-controls {
+  background: transparent !important;
+}
+
+/* Search shortcut chip in the header */
+[data-theme="light"] .search-shortcut {
+  background: var(--ds-surface-3);
+  color: var(--ds-text-3);
+}
+
+/* Ticker quick-add rows (legacy !important dark block) */
+[data-theme="light"] .ticker-input-row input {
+  background: var(--ds-surface-3) !important;
+  border-color: var(--ds-border) !important;
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] .ticker-add-panel {
+  background: var(--ds-surface);
+  border-color: var(--ds-border);
+}
+
+[data-theme="light"] .ticker-cancel-btn {
+  border-color: var(--ds-border);
+}
+
+/* Hero header copy */
+[data-theme="light"] .hero-title {
+  color: var(--ds-text);
+}
+
+[data-theme="light"] .hero-subtitle {
+  color: var(--ds-text-3) !important;
+}
+
+/* Market status pill in the hero (hard-coded #181818/#B0B0B0) */
+[data-theme="light"] .market-status-pill,
+[data-theme="light"] .last-sync-pill {
+  background: var(--ds-surface);
+  border-color: var(--ds-border);
+  color: var(--ds-text-2);
+}
+
+/* Refresh button: dark text stays legible on the amber gradient */
+[data-theme="light"] .refresh-btn {
+  color: #101014 !important;
+}
+
+[data-theme="light"] .strategy-builder-title {
+  color: var(--ds-text) !important;
+}
+
+/* Risk toggle (legacy dark toggle) */
+[data-theme="light"] .sc-risk-toggle {
+  background: var(--ds-surface-3) !important;
+  border-color: var(--ds-border-strong) !important;
+  color: var(--ds-text-3) !important;
+}
+
+[data-theme="light"] .sc-risk-toggle.on {
+  background: var(--primary-bg) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+[data-theme="light"] .cost-toggle-label {
+  color: var(--ds-text-3);
+}
+
+/* Panel titles that were forced white */
+[data-theme="light"] .panel-title,
+[data-theme="light"] .section-label-bar h3 {
+  color: var(--ds-text);
+}
+
+[data-theme="light"] .equity-summary-label {
+  color: var(--ds-text-3);
+}
+
+/* KPI cards: text colors pinned to dark palette */
+[data-theme="light"] .kpi-label,
+[data-theme="light"] .kpi-sub,
+[data-theme="light"] .kpi-footer {
+  color: var(--ds-text-3) !important;
+}
+
+[data-theme="light"] .kpi-value {
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] .kpi-value.pos,
+[data-theme="light"] .kpi-trend.pos {
+  color: #16a34a !important;
+}
+
+[data-theme="light"] .kpi-value.neg,
+[data-theme="light"] .kpi-trend.neg {
+  color: #dc2626 !important;
+}
+
+[data-theme="light"] .kpi-icon-wrapper {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+/* Idle terminal console (fake-market idle state) */
+[data-theme="light"] .idle-terminal-console {
+  background: var(--ds-surface);
+  border-color: var(--ds-border);
+}
+
+[data-theme="light"] .console-icon {
+  background: var(--ds-surface-3);
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .console-text h4 {
+  color: var(--ds-text);
+}
+
+[data-theme="light"] .console-text p {
+  color: var(--ds-text-2) !important;
+}
+
+[data-theme="light"] .news-content,
+[data-theme="light"] .ca-label {
+  color: var(--ds-text-2) !important;
+}
+
+[data-theme="light"] .ca-value.pos {
+  color: #16a34a !important;
+}
+
+[data-theme="light"] .ca-value.neg {
+  color: #dc2626 !important;
+}
+
+/* Trade log table text */
+[data-theme="light"] .tl-table tbody td {
+  color: var(--ds-text-2);
+}
+
+[data-theme="light"] .tl-badge-close {
+  background: rgba(14, 159, 110, .14);
+  color: #0e9f6e;
+}
+
+[data-theme="light"] .tl-badge-stop {
+  background: rgba(220, 38, 38, .14);
+  color: #dc2626;
+}
+
+/* Live ticker / cross-asset strip */
+[data-theme="light"] .live-ticker-change.bull {
+  color: #16a34a;
+}
+
+[data-theme="light"] .live-ticker-change.bear {
+  color: #dc2626;
+}
+
+[data-theme="light"] .ac-equity { color: #0b7f6f; }
+[data-theme="light"] .ac-index { color: #1668a8; }
+[data-theme="light"] .ac-forex { color: #a86b17; }
+[data-theme="light"] .ac-commodity { color: #b03131; }
+[data-theme="light"] .ac-vol { color: #6c41a8; }
+
+/* Cross-asset icon buttons & refresh (were teal-tinted) */
+[data-theme="light"] .icon-btn:hover {
+  background: var(--primary-bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+[data-theme="light"] .dq-refresh-btn {
+  background: var(--primary-bg) !important;
+  border-color: rgba(217, 119, 6, .35) !important;
+  color: var(--primary) !important;
+}
+
+[data-theme="light"] .dq-refresh-btn:hover {
+  background: rgba(217, 119, 6, .18) !important;
+  color: var(--primary) !important;
+}
+
+/* Data quality badges/tints */
+[data-theme="light"] .quality-clean > svg {
+  color: #0e9f6e;
+}
+
+[data-theme="light"] .dq-freshness-good {
+  color: #16a34a;
+}
+
+[data-theme="light"] .dq-freshness-warning {
+  color: #b45309;
+}
+
+[data-theme="light"] .dq-freshness-critical {
+  color: #dc2626;
+}
+
+[data-theme="light"] .chart-live-badge {
+  color: #0a8576;
+  background: rgba(10, 133, 118, .10);
+  border-color: rgba(10, 133, 118, .35);
+}
+
+/* Mobility drawer */
+[data-theme="light"] .drawer-content {
+  background: var(--ds-surface);
+  border-color: var(--ds-border);
+}
+
+[data-theme="light"] .menu-toggle-btn {
+  background: var(--ds-surface-3) !important;
+  border-color: var(--ds-border) !important;
+}
+
+[data-theme="light"] .drawer-close {
+  color: var(--text-muted) !important;
+}
+
+/* User avatar initials on the amber gradient */
+[data-theme="light"] .user-avatar {
+  color: #101014;
+}
+
+/* Landing theme toggle */
+[data-theme="light"] .theme-toggle-btn {
+  background: var(--ds-surface);
+  border-color: var(--ds-border);
+  color: var(--text-secondary);
+}
+
+/* Equity alpha chips */
+[data-theme="light"] .equity-summary-chip.equity-alpha.pos .equity-summary-value {
+  color: #15803d;
+}
+
+[data-theme="light"] .equity-summary-chip.equity-alpha.neg .equity-summary-value {
+  color: #b91c1c;
+}
+
+/* Parameter sweep best label */
+[data-theme="light"] .sweep-best {
+  color: #15803d;
+}
+
+/* Ticker asset chips in add-preview */
+[data-theme="light"] .ticker-asset-chip {
+  background: var(--ds-chip-bg) !important;
+}
+
+[data-theme="light"] .dq-asset-badge .ac-equity,
+[data-theme="light"] .ticker-asset-chip.ac-equity {
+  color: #0b7f6f;
+  background: rgba(11, 127, 111, .12) !important;
+}
+
+[data-theme="light"] .dq-stat-card {
+  border-color: rgba(217, 119, 6, .18) !important;
+}
+
+[data-theme="light"] .drawer-divider {
+  background: rgba(20, 30, 48, .08) !important;
+}
+
+[data-theme="light"] .kpi-badge {
+  background: var(--ds-surface-3) !important;
+  color: var(--ds-text-2) !important;
+}
+
+/* Pipeline dashboard frame (was slate-900) */
+[data-theme="light"] .pipeline-dashboard-frame {
+  background: var(--ds-surface) !important;
+  border-color: var(--ds-border);
+}
+
+/* Trade table header (was #111217) and row tint */
+[data-theme="light"] .trade-table thead th {
+  background: var(--ds-surface-3) !important;
+  color: var(--ds-text-3) !important;
+}
+
+[data-theme="light"] .trade-table tbody tr:hover {
+  background: var(--ds-row-hover) !important;
+}
+
+[data-theme="light"] .trade-table .col-pnl.positive {
+  color: #16a34a !important;
+}
+
+[data-theme="light"] .trade-table .col-pnl.negative {
+  color: #dc2626 !important;
+}
+
+/* Trade log header */
+[data-theme="light"] .tl-table thead th {
+  background: var(--ds-surface-2);
+  color: var(--ds-text-3);
+}
+
+/* Sweep run button hover (navy was fine on dark, deepen for light) */
+[data-theme="light"] .btn-run:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+/* Dashboard asset-filter chips (were teal tinted) */
+[data-theme="light"] .chip {
+  background: var(--primary-bg);
+  border-color: rgba(217, 119, 6, .20);
+}
+
+[data-theme="light"] .chip:hover {
+  background: rgba(217, 119, 6, .15);
+}
+
+[data-theme="light"] .chip-active {
+  background: rgba(217, 119, 6, .25);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Percent bars / quality bars (dark track) */
+[data-theme="light"] .percent-bar-container,
+[data-theme="light"] .dq-quality-bar {
+  background: rgba(20, 30, 48, .08) !important;
+}
+
+[data-theme="light"] .dq-table thead {
+  background: rgba(217, 119, 6, .06) !important;
+}
+
+[data-theme="light"] .dq-table tbody tr:hover {
+  background: rgba(217, 119, 6, .03) !important;
+}
+
+[data-theme="light"] .dq-asset-badge {
+  background: rgba(20, 30, 48, .05) !important;
+}
+
+[data-theme="light"] .quality-badge {
+  background: rgba(217, 119, 6, .08) !important;
+}
+
+/* Risk tiles */
+[data-theme="light"] .risk-tile:hover {
+  border-color: var(--ds-border-strong) !important;
+}
+
+/* Icon buttons / admin gear / quality refresh / drawer close family */
+[data-theme="light"] .theme-toggle,
+[data-theme="light"] .admin-gear,
+[data-theme="light"] .quality-refresh {
+  background: var(--ds-surface-3) !important;
+  color: var(--ds-text-2) !important;
+}
+
+[data-theme="light"] .theme-toggle:hover,
+[data-theme="light"] .admin-gear:hover,
+[data-theme="light"] .quality-refresh:hover {
+  background: var(--primary-bg) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+/* Ticker input label */
+[data-theme="light"] .ticker-input > label {
+  color: var(--ds-text-2) !important;
+}
+
+/* IDE shell surfaces (were near-black) */
+[data-theme="light"] .ide-shell,
+[data-theme="light"] .ide-main-content,
+[data-theme="light"] .global-app-bar {
+  background: var(--ds-bg) !important;
+}
+
+[data-theme="light"] .ide-sidebar {
+  background: var(--ds-surface) !important;
+  border-color: var(--ds-border) !important;
+}
+
+[data-theme="light"] .global-search-container input {
+  background: var(--ds-surface-3) !important;
+  border-color: var(--ds-border) !important;
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] .ide-sidebar .sidebar-tab,
+[data-theme="light"] .brand-text span {
+  color: var(--ds-text-2) !important;
+}
+
+[data-theme="light"] .ide-sidebar .sidebar-tab:hover {
+  background: rgba(217, 119, 6, .06) !important;
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] .ide-sidebar .sidebar-tab.active {
+  background: rgba(217, 119, 6, .10) !important;
+  color: var(--primary) !important;
+}
+
+[data-theme="light"] .ide-sidebar .brand-text h1 {
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] .sidebar-project-card .card-desc {
+  color: var(--ds-text-2) !important;
+}
+
+/* ── Form controls: defeat the legacy "Input normalization"
+      block (input[type=…], select → #111111 !important),
+      which out-ranks the generic token rule by specificity. ── */
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] input[type="date"],
+[data-theme="light"] select,
+[data-theme="light"] .control-bar input,
+[data-theme="light"] .control-bar select,
+[data-theme="light"] .strategy-config input,
+[data-theme="light"] .strategy-config select,
+[data-theme="light"] .ticker-input-row input,
+[data-theme="light"] textarea {
+  background: var(--ds-surface-3) !important;
+  border: 1px solid var(--ds-border) !important;
+  color: var(--ds-text) !important;
+}
+
+[data-theme="light"] input:hover,
+[data-theme="light"] select:hover,
+[data-theme="light"] textarea:hover {
+  border-color: var(--ds-border-strong) !important;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  border-color: var(--ds-accent) !important;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, .18) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: var(--ds-text-3) !important;
+}
+
+[data-theme="light"] input:disabled,
+[data-theme="light"] select:disabled,
+[data-theme="light"] textarea:disabled {
+  opacity: .55 !important;
+  cursor: not-allowed !important;
+  border-color: var(--ds-border) !important;
+}
+
+[data-theme="light"] .ide-sidebar .brand-text span {
+  color: var(--primary);
 }
