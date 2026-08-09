@@ -8,6 +8,7 @@ import CrossAssetMonitor from './CrossAssetMonitor';
 import DataQualityDashboard from './DataQualityDashboard';
 import useBacktestStore from '../store/useBacktestStore';
 import useAIStore from '../store/useAIStore';
+import TradeRetroLogo from './ui/TradeRetroLogo';
 import { CopilotPanel } from './copilot';
 
 function MarketClock() {
@@ -127,7 +128,9 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
     <div className={`ide-shell app-shell-v2 ${sidebarPinned ? 'sidebar-pinned' : ''} ${panelOpen ? 'ai-panel-visible' : ''}`}>
       <aside className="ide-sidebar app-sidebar-v2" aria-label="Primary navigation">
         <div className="sidebar-brand" onClick={onLogoClick} title="Back to launch screen">
-          <div className="brand-logo-icon" aria-hidden="true" />
+          <div className="brand-logo-icon" aria-hidden="true">
+            <TradeRetroLogo size={40} />
+          </div>
           <div className="brand-text">
             <h1>TradeRetro</h1>
             <span>Main Workspace</span>
