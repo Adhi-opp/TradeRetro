@@ -9228,11 +9228,19 @@ html, body, #root {
 
 .pipeline-dashboard-frame {
   position: relative !important;
-  min-height: 360px !important;
+  flex: none;
+  height: clamp(320px, 42vh, 520px);
+  min-height: 0;
   border: 1px solid var(--ds-border) !important;
   border-radius: var(--ds-radius) !important;
   overflow: hidden !important;
   background: #0b1220 !important;
+}
+
+@media (max-width: 640px) {
+  .pipeline-dashboard-frame {
+    height: 300px;
+  }
 }
 
 .pipeline-frame-fallback {
