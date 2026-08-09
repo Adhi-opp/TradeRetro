@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Bot, Menu, X, Pin, PinOff } from 'lucide-react';
+import { Sun, Moon, BarChart3, Grid3x3, Settings, Activity, Database, Bot, Menu, X, Pin, PinOff, MessageSquareText, Info } from 'lucide-react';
 import ControlBar from './ControlBar';
 import StrategyConfig from './StrategyConfig';
 import TearsheetGrid from './TearsheetGrid';
@@ -10,6 +10,9 @@ import useBacktestStore from '../store/useBacktestStore';
 import useAIStore from '../store/useAIStore';
 import TradeRetroLogo from './ui/TradeRetroLogo';
 import { CopilotPanel } from './copilot';
+import FeedbackModal from './feedback/FeedbackModal';
+import AboutModal from './about/AboutModal';
+import PRODUCT from '../constants/product';
 
 function MarketClock() {
   const [now, setNow] = useState(() => new Date());
@@ -113,6 +116,8 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
   const [mode, setMode] = useState('manual');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const loading = useBacktestStore((s) => s.loading);
   const panelOpen = useAIStore((s) => s.panelOpen);
   const togglePanel = useAIStore((s) => s.togglePanel);
@@ -161,6 +166,26 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
             <Bot size={18} />
             <span>AI Copilot</span>
           </button>
+          <div className="sidebar-nav-divider" role="separator" />
+          <div className="sidebar-section-label">Support</div>
+          <button
+            className="sidebar-tab"
+            onClick={() => { setFeedbackOpen(true); }}
+            title="Share feedback with the TradeRetro team"
+            aria-haspopup="dialog"
+          >
+            <MessageSquareText size={18} />
+            <span>Feedback</span>
+          </button>
+          <button
+            className="sidebar-tab"
+            onClick={() => { setAboutOpen(true); }}
+            title="About TradeRetro"
+            aria-haspopup="dialog"
+          >
+            <Info size={18} />
+            <span>About</span>
+          </button>
         </nav>
 
         <div className="sidebar-project-card">
@@ -177,6 +202,11 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
           {sidebarPinned ? <PinOff size={16} /> : <Pin size={16} />}
           <span>{sidebarPinned ? 'Unpin' : 'Pin'}</span>
         </button>
+
+        <div className="sidebar-version">
+          <span className="sidebar-version-label mono">{PRODUCT.version}</span>
+          <span className="sidebar-version-sub">{PRODUCT.releaseTitle}</span>
+        </div>
       </aside>
 
       <div className="ide-main-content">
@@ -270,6 +300,22 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
                   <span>{label}</span>
                 </button>
               ))}
+              <div className="drawer-divider" role="separator" />
+              <div className="drawer-section-title">Support</div>
+              <button
+                className="drawer-tab"
+                onClick={() => { setDrawerOpen(false); setFeedbackOpen(true); }}
+              >
+                <MessageSquareText size={18} />
+                <span>Feedback</span>
+              </button>
+              <button
+                className="drawer-tab"
+                onClick={() => { setDrawerOpen(false); setAboutOpen(true); }}
+              >
+                <Info size={18} />
+                <span>About</span>
+              </button>
             </nav>
             <div className="drawer-footer">
               <MarketClock />
@@ -279,12 +325,19 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
                   <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                 </button>
               </div>
+              <div className="drawer-version">
+                <span className="mono">{PRODUCT.version}</span>
+                <span>{PRODUCT.releaseTitle}</span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       <CopilotPanel />
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
     </div>
   );
 }

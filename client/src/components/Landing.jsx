@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { Terminal, Sun, Moon, Database, Activity, FlaskConical, RotateCcw } from 'lucide-react';
 import TradeRetroLogo from './ui/TradeRetroLogo';
+import PRODUCT from '../constants/product';
 
 const CAPABILITIES = [
   { Icon: FlaskConical, title: 'Strategy Validation', desc: 'Test systematic trading ideas against historical market behaviour.' },
@@ -56,7 +57,7 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
           ))}
         </div>
 
-        <div className="landing-version">v0.4 - FastAPI + TimescaleDB</div>
+        <div className="landing-version">{PRODUCT.version} - {PRODUCT.releaseTitle}</div>
       </div>
     </div>
   );
