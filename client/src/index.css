@@ -247,7 +247,7 @@ body {
 }
 
 .landing-title {
-  font-size: 3rem;
+  font-size: 3rem !important;
   font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--text-primary);
@@ -264,7 +264,7 @@ body {
 
 .landing-desc {
   font-size: .9rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   line-height: 1.7;
   margin-bottom: 40px;
   max-width: 420px;
@@ -297,7 +297,7 @@ body {
 .landing-version {
   margin-top: 32px;
   font-size: .72rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   letter-spacing: .04em;
 }
@@ -1784,6 +1784,11 @@ body {
     display: none;
   }
 
+  .landing {
+    height: auto;
+    min-height: 100vh;
+  }
+
   .ide-body {
     flex-direction: column;
   }
@@ -1827,7 +1832,7 @@ body {
   }
 
   .landing-title {
-    font-size: 2rem;
+    font-size: 2rem !important;
   }
 
   .landing-subtitle {
@@ -1857,7 +1862,19 @@ body {
   }
 
   .landing-title {
-    font-size: 1.75rem;
+    font-size: 1.75rem !important;
+  }
+}
+
+/* ── Landing: tight-phone guard (360px-class) ─────────── */
+
+@media (max-width: 400px) {
+  .landing-content {
+    padding: 40px 16px;
+  }
+
+  .landing-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

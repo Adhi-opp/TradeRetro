@@ -3,7 +3,7 @@ import { Terminal, Sun, Moon, BarChart3, TrendingUp, Zap, Database } from 'lucid
 export default function Landing({ onEnter, theme, onToggleTheme }) {
   return (
     <div className="landing">
-      <button className="theme-toggle landing-theme-toggle" onClick={onToggleTheme} title="Toggle theme">
+      <button className="theme-toggle landing-theme-toggle" onClick={onToggleTheme} title="Toggle theme" aria-label="Toggle dark/light theme">
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
       <div className="landing-content">
