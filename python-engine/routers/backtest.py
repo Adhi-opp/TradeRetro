@@ -1,9 +1,10 @@
 """
 Backtest Router
 ===============
-POST /api/backtest        — run a single strategy backtest
-POST /api/backtest/sweep  — parameter sweep, returns 2D metric grid
-POST /api/backtest/wfa    — walk-forward analysis (out-of-sample robustness)
+POST /api/backtest              — run a single strategy backtest
+POST /api/backtest/sweep        — parameter sweep, returns 2D metric grid
+POST /api/backtest/wfa          — walk-forward analysis (out-of-sample robustness)
+POST /api/backtest/significance — bootstrap CIs on Sharpe/CAGR
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from engine.bootstrap import significance_report
 from engine.simulation import SimulationEngine
 from engine.wfa import run_wfa, strategy_warmup
 from models.requests import STRATEGY_TYPES, BacktestRequest
@@ -137,6 +139,75 @@ async def backtest(req: BacktestRequest):
         ) from validation_err
 
     return result
+
+
+# ── Statistical Significance ─────────────────────────────────────
+
+class SignificanceRequest(BacktestRequest):
+    resamples: int = Field(1000, ge=100, le=10000)
+    meanBlockDays: int = Field(10, ge=1, le=120)
+    confidence: float = Field(0.95, gt=0.5, lt=0.9999)
+
+
+@router.post("/api/backtest/significance")
+async def backtest_significance(req: SignificanceRequest):
+    """
+    Run the backtest, then attach a stationary block bootstrap confidence
+    interval and p-value to the headline statistics.
+
+    A single Sharpe number cannot answer "is this edge real?". With ~2,000
+    daily observations the standard error on an annualized Sharpe is roughly
+    1/sqrt(years) ≈ 0.35, so most backtest Sharpes in this range are not
+    distinguishable from zero — and saying so is a stronger result than
+    quoting the point estimate alone.
+    """
+    start_time = time.time()
+    window = await _load_window(req)
+    _ensure_strategy_has_data(req, window)
+    market_data = _dataframe_to_market_data(window)
+
+    try:
+        engine = SimulationEngine(
+            market_data, req.params["initialCapital"],
+            {"strategyType": req.strategyType, "params": req.params},
+            visible_start_index=window.visible_start_index,
+        )
+        result = engine.run()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=_error_body("BACKTEST_EXECUTION_ERROR", f"Backtest execution error: {exc}"),
+        ) from exc
+
+    equity = [p["equity"] for p in result["equityCurve"]]
+    loop = asyncio.get_running_loop()
+    report = await loop.run_in_executor(
+        None,
+        lambda: significance_report(
+            equity,
+            statistics=["sharpe", "cagr", "totalReturn"],
+            resamples=req.resamples,
+            mean_block=req.meanBlockDays,
+            confidence=req.confidence,
+            seed=req.params.get("seed", 42),
+        ),
+    )
+
+    m = result["metrics"]
+    return {
+        "symbol": req.symbol,
+        "strategyType": req.strategyType,
+        "observedMetrics": {
+            "sharpeRatio": m["sharpeRatio"],
+            "cagr": m["cagr"],
+            "totalReturn": m["totalReturn"],
+            "totalTrades": m["totalTrades"],
+            "totalDays": m["totalDays"],
+            "years": round(m["totalDays"] / 252, 2),
+        },
+        "significance": report,
+        "executionTimeMs": round((time.time() - start_time) * 1000, 1),
+    }
 
 
 # ── Parameter Sweep ──────────────────────────────────────────────

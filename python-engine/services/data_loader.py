@@ -87,13 +87,41 @@ def _parse_optional_date(value: Optional[str], field_name: str) -> Optional[date
         raise InvalidDateError(f"{field_name} must be a valid YYYY-MM-DD date.") from exc
 
 
+async def _resolve_warehouse_ticker(ticker: str) -> str:
+    """
+    Map a requested symbol onto the key actually stored in the warehouse.
+
+    NSE equities and indices are stored with a `.NS` suffix, but the macro
+    series are stored bare: USDINR, CRUDE, INDIAVIX. Unconditionally appending
+    `.NS` made those three permanently unreachable from the backtest API —
+    every request 404'd on a ticker the Cross-Asset Monitor was happily
+    charting from the same table.
+
+    Exact match wins; the `.NS` variant is the fallback.
+    """
+    ticker = ticker.strip().upper()
+    try:
+        pool = get_pool()
+        async with pool.acquire() as conn:
+            exact = await conn.fetchval(
+                "SELECT 1 FROM raw.historical_prices WHERE ticker = $1 LIMIT 1", ticker
+            )
+            if exact:
+                return ticker
+    except Exception:
+        # No pool yet (or DB down) — fall through to the suffix heuristic and
+        # let the caller surface the real connection error.
+        pass
+    return ticker if ticker.endswith(".NS") else f"{ticker}.NS"
+
+
 async def load_historical_data(
     ticker: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     warmup_candles: int = 0,
 ) -> HistoricalDataWindow:
-    pg_ticker = ticker if ticker.endswith(".NS") else f"{ticker}.NS"
+    pg_ticker = await _resolve_warehouse_ticker(ticker)
     start_date_obj = _parse_optional_date(start_date, "startDate")
     end_date_obj = _parse_optional_date(end_date, "endDate")
 
