@@ -24,6 +24,7 @@ from config import settings
 from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
 from pipeline.consumer import consume_loop
+from pipeline.gold_refresh import startup_backfill
 from pipeline.silver_aggregator import run_aggregator_loop
 
 logger = logging.getLogger("traderetro.worker")
@@ -49,6 +50,11 @@ async def main() -> None:
         # Always run the consumer + silver aggregator (Medallion bronze → silver)
         tasks.append(asyncio.create_task(consume_loop(), name="consumer"))
         tasks.append(asyncio.create_task(run_aggregator_loop(), name="silver_aggregator"))
+
+        # One-shot silver → gold catch-up. TimescaleDB's trailing refresh
+        # policies (2h / 3d) never materialize buckets that aged out while the
+        # stack was down, so a restart is the natural place to heal the gap.
+        tasks.append(asyncio.create_task(startup_backfill(), name="gold_backfill"))
 
         if mode == "simulate":
             from pipeline.simulator import run_simulator

@@ -3,9 +3,20 @@ Tick Simulator — generates realistic fake market ticks for pipeline testing.
 Pushes to the same Redis Stream as the real Upstox producer, so the consumer
 doesn't know the difference.
 
+Every tick carries source='simulator' so nothing downstream can mistake it
+for live NSE data.
+
+By default the simulator only runs inside the NSE stream window (09:00-15:40
+IST on trading days), matching the real Upstox producer. Without that gate it
+emitted ticks around the clock, so the dashboard header could read
+"NSE CLOSED" while prices ticked beside it on a Sunday. Set
+SIMULATE_IGNORE_MARKET_HOURS=1 to run continuously for a demo or load test —
+the log line then says so explicitly.
+
 Usage:
-    python -m pipeline.simulator            # default: 5 instruments, 10 ticks/sec
-    SIMULATE_RATE=50 python -m pipeline.simulator   # 50 ticks/sec
+    python -m pipeline.simulator                       # market hours only
+    SIMULATE_RATE=50 python -m pipeline.simulator      # 50 ticks/sec
+    SIMULATE_IGNORE_MARKET_HOURS=1 python -m pipeline.simulator
 """
 
 import asyncio
@@ -15,9 +26,14 @@ import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from pipeline.market_hours import is_stream_window, seconds_until_stream_start
+
 IST = ZoneInfo("Asia/Kolkata")
 
 logger = logging.getLogger("traderetro.simulator")
+
+# How long to sleep between market-window checks when the market is shut.
+CLOSED_POLL_SECONDS = 60
 
 # Simulated NSE instruments. Base prices are a fallback only — on startup
 # the simulator queries the EOD warehouse for the most recent close per
@@ -120,15 +136,37 @@ async def run_simulator(ticks_per_second: int = 10) -> None:
     # drift unboundedly between dashboard refreshes.
     anchors = await _bootstrap_prices_from_warehouse()
     sample = {INSTRUMENTS[k][0]: round(v, 2) for k, v in list(anchors.items())[:5]}
+
+    ignore_hours = os.environ.get("SIMULATE_IGNORE_MARKET_HOURS", "").lower() in ("1", "true", "yes")
     logger.info(
-        "Simulator started: %d instruments, %d ticks/sec, anchor sample=%s",
-        len(INSTRUMENTS), ticks_per_second, sample,
+        "Simulator started: %d instruments, %d ticks/sec, schedule=%s, anchor sample=%s",
+        len(INSTRUMENTS), ticks_per_second,
+        "CONTINUOUS (market hours ignored)" if ignore_hours else "NSE stream window 09:00-15:40 IST",
+        sample,
     )
 
     interval = 1.0 / ticks_per_second
     total_ticks = 0
+    was_closed = False
 
     while True:
+        # Mirror the real producer: no ticks outside the NSE stream window, so
+        # silver never accumulates bars for minutes the market never traded.
+        if not ignore_hours and not is_stream_window():
+            if not was_closed:
+                wait = seconds_until_stream_start()
+                logger.info(
+                    "Market closed — simulator idle, next NSE stream window in %.1f h",
+                    wait / 3600,
+                )
+                was_closed = True
+            await asyncio.sleep(CLOSED_POLL_SECONDS)
+            continue
+
+        if was_closed:
+            logger.info("Market open — simulator resuming tick generation")
+            was_closed = False
+
         for inst_key, (symbol, _warehouse_key, _fallback) in INSTRUMENTS.items():
             tick = _generate_tick(inst_key, symbol, anchors[inst_key])
             await xadd_tick({k: v.encode() if isinstance(v, str) else v for k, v in tick.items()})

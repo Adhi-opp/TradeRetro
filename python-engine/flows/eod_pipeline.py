@@ -119,10 +119,21 @@ async def fetch_daily_candle(ticker: str) -> list[dict]:
 
 
 @task
-async def upsert_raw_prices(ticker: str, rows: list[dict]) -> int:
-    """Upsert daily OHLCV rows into raw.historical_prices."""
+async def upsert_raw_prices(ticker: str, rows: list[dict]) -> dict:
+    """
+    Upsert daily OHLCV rows into raw.historical_prices.
+
+    Returns {inserted, attempted, min_date, max_date}. `inserted` is measured,
+    not assumed: the statement is ON CONFLICT DO NOTHING, so re-running a
+    window inserts nothing while still "attempting" every row. Returning the
+    attempted count is what made Grafana's "Total Rows Ingested" climb on
+    every idempotent re-run.
+
+    The date bounds flow into the quality gate so it validates the rows this
+    run actually touched.
+    """
     if not rows:
-        return 0
+        return {"inserted": 0, "attempted": 0, "min_date": None, "max_date": None}
 
     from services.db import get_pool
     pool = get_pool()
@@ -131,8 +142,15 @@ async def upsert_raw_prices(ticker: str, rows: list[dict]) -> int:
         (ticker, r["date"], r["open"], r["high"], r["low"], r["close"], r["volume"])
         for r in rows
     ]
+    dates = [r["date"] for r in rows]
+    lo, hi = min(dates), max(dates)
 
     async with pool.acquire() as conn:
+        before = await conn.fetchval(
+            "SELECT count(*) FROM raw.historical_prices "
+            "WHERE ticker = $1 AND trade_date BETWEEN $2 AND $3",
+            ticker, lo, hi,
+        )
         await conn.executemany(
             "INSERT INTO raw.historical_prices "
             "(ticker, trade_date, open_price, high_price, low_price, close_price, volume) "
@@ -140,15 +158,27 @@ async def upsert_raw_prices(ticker: str, rows: list[dict]) -> int:
             "ON CONFLICT (ticker, trade_date) DO NOTHING",
             tuples,
         )
+        after = await conn.fetchval(
+            "SELECT count(*) FROM raw.historical_prices "
+            "WHERE ticker = $1 AND trade_date BETWEEN $2 AND $3",
+            ticker, lo, hi,
+        )
 
-    get_run_logger().info("Upserted %d rows for %s", len(tuples), ticker)
-    return len(tuples)
+    inserted = int(after - before)
+    get_run_logger().info(
+        "Upserted %s: %d new of %d fetched (%s -> %s)",
+        ticker, inserted, len(tuples), lo, hi,
+    )
+    return {"inserted": inserted, "attempted": len(tuples), "min_date": lo, "max_date": hi}
 
 
 @task
-async def quality_gate(ticker: str, only_recent: bool = True) -> dict:
-    """Run data quality checks. Returns result dict."""
-    result = await run_quality_checks(ticker, only_recent=only_recent)
+async def quality_gate(ticker: str, only_recent: bool = True,
+                       start_date=None, end_date=None) -> dict:
+    """Run data quality checks over the rows this run actually wrote."""
+    result = await run_quality_checks(
+        ticker, only_recent=only_recent, start_date=start_date, end_date=end_date
+    )
     log = get_run_logger()
     if result["hard_fail"]:
         log.error("DQ HARD FAIL for %s: %s", ticker, result["hard_failures"])
@@ -214,35 +244,21 @@ async def compute_signals(ticker: str) -> int:
 
 @task
 async def aggregate_ticks_to_silver(instrument_key: str, trade_date: date | None = None) -> int:
-    """Aggregate bronze ticks into silver 1-minute OHLCV bars for a given day."""
-    from services.db import get_pool
-    pool = get_pool()
+    """
+    Aggregate bronze ticks into silver 1-minute OHLCV bars for a given day.
+
+    Delegates to pipeline.silver_aggregator so the streaming path and the EOD
+    path share one projection. This task used to carry its own copy of the SQL
+    that wrote `max(volume)` where the streaming aggregator writes
+    `sum(volume)` — same table, same column, two different meanings depending
+    on which writer ran last.
+    """
+    from pipeline.silver_aggregator import aggregate_day
+
     target = trade_date or date.today()
     log = get_run_logger()
 
-    async with pool.acquire() as conn:
-        result = await conn.execute("""
-            INSERT INTO silver.ohlcv_1min
-                (instrument_key, bucket, open, high, low, close, volume, trade_count)
-            SELECT
-                instrument_key,
-                time_bucket('1 minute', timestamp) AS bucket,
-                first(ltp, timestamp)  AS open,
-                max(ltp)               AS high,
-                min(ltp)               AS low,
-                last(ltp, timestamp)   AS close,
-                max(volume)            AS volume,
-                count(*)               AS trade_count
-            FROM bronze.market_ticks
-            WHERE instrument_key = $1 AND timestamp::date = $2
-            GROUP BY instrument_key, bucket
-            ON CONFLICT (instrument_key, bucket) DO UPDATE SET
-                open  = EXCLUDED.open,  high = EXCLUDED.high,
-                low   = EXCLUDED.low,   close = EXCLUDED.close,
-                volume = EXCLUDED.volume, trade_count = EXCLUDED.trade_count
-        """, instrument_key, target)
-
-    count = int(result.split()[-1]) if result else 0
+    count = await aggregate_day(instrument_key, target)
     if count > 0:
         log.info("Aggregated %d 1min bars for %s on %s", count, instrument_key, target)
     return count
@@ -326,9 +342,13 @@ async def eod_pipeline(tickers: list[str] | None = None):
                 await log_ingestion(ticker, "incremental", 0, 0, "success")
                 continue
 
-            inserted = await upsert_raw_prices(ticker, rows)
+            load = await upsert_raw_prices(ticker, rows)
+            inserted = load["inserted"]
 
-            dq = await quality_gate(ticker, only_recent=True)
+            # Validate exactly the window this run wrote, not "today".
+            dq = await quality_gate(
+                ticker, start_date=load["min_date"], end_date=load["max_date"]
+            )
             if dq["hard_fail"]:
                 await log_ingestion(
                     ticker, "incremental", len(rows), inserted, "failed",
