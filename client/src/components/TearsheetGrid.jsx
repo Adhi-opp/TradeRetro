@@ -74,7 +74,7 @@ export default function TearsheetGrid({ theme }) {
 
   return (
     <div className="tearsheet">
-      <KpiRibbon metrics={metrics} analytics={analytics} />
+      <KpiRibbon metrics={metrics} applyCosts={applyCosts} />
 
       {/* Row 1 — 70 / 30 : equity curve | execution stats */}
       <div className="ts-row ts-row-7030">

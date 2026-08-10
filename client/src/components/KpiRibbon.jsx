@@ -15,19 +15,40 @@ const pct = (v, dp = 1) => (v == null ? '—' : `${v >= 0 ? '' : ''}${v.toFixed(
 const signedPct = (v, dp = 2) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(dp)}%`);
 const toneOf = (v) => (v == null ? '' : v >= 0 ? 'pos' : 'neg');
 
-export default function KpiRibbon({ metrics, analytics }) {
+// A Sharpe of 0.002 rounds to "0.00" at two decimals and reads as missing
+// data rather than as a near-zero result. Widen the precision only when the
+// value would otherwise vanish.
+export const ratio = (v) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  if (v !== 0 && Math.abs(v) < 0.005) return v.toFixed(3);
+  return v.toFixed(2);
+};
+
+export default function KpiRibbon({ metrics, applyCosts }) {
   if (!metrics) return null;
 
-  const alpha = (metrics.totalReturn ?? 0) - (metrics.buyHoldReturn ?? 0);
+  // Excess CAGR, not alpha — a plain return spread with no beta adjustment.
+  // Comes from the engine so gross and net views stay internally consistent.
+  const excess = metrics.excessCagr;
 
   return (
     <div className="kpi-ribbon">
-      <Kpi label="Total Return" value={signedPct(metrics.totalReturn)} tone={toneOf(metrics.totalReturn)} />
+      <Kpi
+        label="Total Return"
+        value={signedPct(metrics.totalReturn)}
+        tone={toneOf(metrics.totalReturn)}
+        sub={applyCosts ? 'net of costs' : 'costs excluded'}
+      />
       <Kpi label="CAGR" value={signedPct(metrics.cagr)} tone={toneOf(metrics.cagr)} />
-      <Kpi label="Alpha vs B&H" value={signedPct(alpha)} tone={toneOf(alpha)} sub={`B&H ${signedPct(metrics.buyHoldReturn)}`} />
+      <Kpi
+        label="Excess CAGR"
+        value={signedPct(excess)}
+        tone={toneOf(excess)}
+        sub={`vs B&H ${signedPct(metrics.benchmarkCagr)}`}
+      />
       <Kpi label="Max Drawdown" value={pct(metrics.maxDrawdown)} tone="neg" />
-      <Kpi label="Sharpe" value={metrics.sharpeRatio?.toFixed(2) ?? '—'} tone={toneOf(metrics.sharpeRatio)} />
-      <Kpi label="Sortino" value={analytics?.sortino?.toFixed(2) ?? '—'} tone={toneOf(analytics?.sortino)} />
+      <Kpi label="Sharpe" value={ratio(metrics.sharpeRatio)} tone={toneOf(metrics.sharpeRatio)} sub="rf 6.5%" />
+      <Kpi label="Sortino" value={ratio(metrics.sortinoRatio)} tone={toneOf(metrics.sortinoRatio)} sub="rf 6.5%" />
       <Kpi label="Win Rate" value={pct(metrics.winRate, 0)} tone={metrics.winRate >= 50 ? 'pos' : 'neg'} sub={`${metrics.totalTrades} trades`} />
       <Kpi label="Exposure" value={pct(metrics.exposurePct, 0)} sub="time in market" />
     </div>

@@ -43,8 +43,9 @@
   --orange:   #f07850;
 
   /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Loaded in main.jsx via @fontsource — see the note there. */
+  --font-sans: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --text-xs:   clamp(0.72rem, 0.70rem + 0.15vw, 0.78rem);
   --text-sm:   clamp(0.80rem, 0.76rem + 0.20vw, 0.875rem);
@@ -78,6 +79,23 @@
   --shadow-sm: 0 2px 4px rgba(0,0,0,0.25);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg: 0 12px 32px rgba(0,0,0,0.45);
+
+  /* ── Aliases ────────────────────────────────────────────────
+     Several components were written against token names this
+     stylesheet never defined (--surface, --surface-alt, --accent,
+     --bg-card, --pill, --text-tertiary, --negative). Each var() call
+     silently fell through to a hardcoded dark literal — or, where no
+     fallback was given, dropped the declaration entirely. The result:
+     the Data Quality medallion cards and quality-gate rows rendered
+     dark-on-dark in LIGHT theme, with the numbers invisible.
+     Defining them here makes those components theme-aware. */
+  --surface:        var(--bg-panel);
+  --surface-alt:    var(--bg-input);
+  --bg-card:        var(--bg-panel);
+  --pill:           var(--bg-elevated);
+  --accent:         var(--primary);
+  --text-tertiary:  var(--text-muted);
+  --negative:       var(--red);
 }
 
 /* ── Light Theme ─────────────────────────────────────────── */
@@ -185,149 +203,292 @@ body {
    LANDING PAGE
    ══════════════════════════════════════════════════════════════ */
 
-.landing {
+/* ── Landing ──────────────────────────────────────────────────────
+   Dark-first by design: this is a terminal, and the shell it launches
+   into is a terminal. The ground is the app's own near-black; depth
+   comes from a hairline grid and a single off-centre mint bloom rather
+   than from cards stacked on cards. One orchestrated entrance — every
+   element rises on the same curve, staggered by animationDelay set
+   inline in Landing.jsx. */
+
+.lnd {
   position: relative;
+  min-height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  width: 100%;
+  overflow: hidden;
   background: var(--bg-root);
-  animation: fadeIn .6s var(--ease);
+  padding: 48px 24px;
 }
 
-.landing-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  max-width: 560px;
-  padding: 40px 24px;
+/* Hairline measurement grid — a plotting surface, not decoration. */
+.lnd-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px);
+  background-size: 76px 76px;
+  mask-image: radial-gradient(ellipse 92% 68% at 50% 42%, #000 20%, transparent 78%);
+  pointer-events: none;
 }
 
-.landing-icon {
-  color: var(--blue);
-  margin-bottom: 24px;
-  opacity: .7;
+/* Single accent bloom, held off-centre so the composition isn't symmetric. */
+.lnd-glow {
+  position: absolute;
+  top: -22%;
+  left: 58%;
+  width: min(920px, 105vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary) 15%, transparent) 0%,
+    transparent 62%
+  );
+  filter: blur(46px);
+  pointer-events: none;
 }
 
-.landing-title {
-  font-size: 3rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-.landing-subtitle {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
-  letter-spacing: -0.01em;
-}
-
-.landing-desc {
-  font-size: .9rem;
-  color: var(--text-muted);
-  line-height: 1.7;
-  margin-bottom: 40px;
-  max-width: 420px;
-}
-
-.landing-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 40px;
-  border: 1px solid var(--blue);
-  border-radius: var(--radius-sm);
-  background: rgba(59,130,246,.1);
-  color: var(--blue);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: .02em;
-  cursor: pointer;
-  transition: all .3s var(--ease);
-  animation: glowPulse 3s ease-in-out infinite;
-}
-
-.landing-btn:hover {
-  background: var(--blue);
-  color: #fff;
-  transform: translateY(-2px);
-}
-
-.landing-version {
-  margin-top: 32px;
-  font-size: .72rem;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  letter-spacing: .04em;
-}
-
-.landing-logo-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.landing-features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 16px;
-  margin: 32px 0;
+.lnd-content {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 500px;
-}
-
-.landing-feature {
+  max-width: 940px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(59,130,246,0.05);
-  border: 1px solid rgba(59,130,246,0.15);
-  border-radius: var(--radius-sm);
-  color: var(--blue);
   text-align: left;
 }
 
-.landing-feature-title {
-  font-size: .8rem;
-  font-weight: 600;
-  color: var(--text-primary);
+.lnd-content > * {
+  opacity: 0;
+  animation: lndRise .62s cubic-bezier(.22, .8, .3, 1) forwards;
 }
 
-.landing-feature-desc {
-  font-size: .68rem;
+@keyframes lndRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── status line ── */
+.lnd-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  font-weight: 500;
+  letter-spacing: .16em;
   color: var(--text-secondary);
-  line-height: 1.4;
+  margin-bottom: 26px;
 }
 
-.landing-stack {
+.lnd-eyebrow-sep { color: var(--text-muted); }
+
+.lnd-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex: none;
+}
+
+.lnd-dot-live {
+  background: var(--primary);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
+  animation: lndPulse 2.4s ease-out infinite;
+}
+
+.lnd-dot-loading { background: var(--amber); }
+.lnd-dot-offline { background: var(--red); }
+
+@keyframes lndPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ── headline ── */
+.lnd-title {
+  font-family: var(--font-sans);
+  font-size: clamp(3.2rem, 9vw, 6.4rem);
+  font-weight: 700;
+  letter-spacing: -.05em;
+  line-height: .92;
+  color: var(--text-primary);
+  margin: 0 0 22px;
+}
+
+.lnd-thesis {
+  font-family: var(--font-sans);
+  font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+  font-weight: 500;
+  line-height: 1.34;
+  letter-spacing: -.018em;
+  color: var(--text-primary);
+  margin: 0 0 20px;
+  max-width: 22ch;
+}
+
+.lnd-thesis em {
+  font-style: normal;
+  color: var(--primary);
+}
+
+.lnd-desc {
+  font-size: .93rem;
+  line-height: 1.72;
+  color: var(--text-secondary);
+  max-width: 62ch;
+  margin: 0 0 44px;
+}
+
+/* ── medallion funnel ── */
+.lnd-funnel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 1px;
+  width: 100%;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 40px;
+}
+
+.lnd-stage {
+  position: relative;
+  background: var(--bg-panel);
+  padding: 17px 18px 15px;
+  opacity: 0;
+  animation: lndRise .62s cubic-bezier(.22, .8, .3, 1) forwards;
+}
+
+/* Tier stripe — the medallion layer is encoded in colour, not just text. */
+.lnd-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--stage, var(--text-muted));
+}
+
+.lnd-stage-bronze    { --stage: #b87333; }
+.lnd-stage-silver    { --stage: #9aa6a3; }
+.lnd-stage-gold      { --stage: var(--gold); }
+.lnd-stage-warehouse { --stage: var(--primary); }
+
+.lnd-stage-tier {
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--stage);
+  margin-bottom: 9px;
+}
+
+.lnd-stage-value {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.lnd-stage-label {
+  font-size: .76rem;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.lnd-stage-sub {
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  color: var(--text-muted);
+  margin-top: 5px;
+  letter-spacing: .02em;
+}
+
+/* ── call to action ── */
+.lnd-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 26px;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: .88rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .22s var(--ease), color .22s var(--ease),
+              transform .22s var(--ease), box-shadow .22s var(--ease);
+}
+
+.lnd-cta svg { transition: transform .22s var(--ease); }
+
+.lnd-cta:hover {
+  background: var(--primary);
+  color: var(--bg-root);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.lnd-cta:hover svg { transform: translateX(3px); }
+
+.lnd-cta:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+/* ── footer chips ── */
+.lnd-foot {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 28px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 44px;
 }
 
-.landing-stack span {
-  padding: 4px 10px;
-  font-size: .65rem;
-  font-family: var(--font-mono);
-  background: rgba(100,116,139,0.1);
-  border: 1px solid rgba(100,116,139,0.2);
+.lnd-foot span {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
   border-radius: 3px;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  letter-spacing: .1em;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.lnd-foot-ver {
+  border-color: color-mix(in srgb, var(--primary) 34%, transparent) !important;
+  color: var(--primary) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lnd-content > *,
+  .lnd-stage {
+    animation: none;
+    opacity: 1;
+  }
+  .lnd-dot-live { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .lnd { padding: 32px 18px; }
+  .lnd-thesis { max-width: none; }
+  .lnd-foot { margin-top: 32px; }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1783,14 +1944,6 @@ body {
     font-size: 1.15rem;
   }
 
-  .landing-title {
-    font-size: 2rem;
-  }
-
-  .landing-subtitle {
-    font-size: .95rem;
-  }
-
   .verdict-label {
     font-size: 1.2rem;
   }
@@ -1813,9 +1966,6 @@ body {
     flex-wrap: wrap;
   }
 
-  .landing-title {
-    font-size: 1.75rem;
-  }
 }
 
 /* ── Right Pane Tabs ─────────────────────────────────── */
