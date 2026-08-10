@@ -252,6 +252,40 @@ body {
   pointer-events: none;
 }
 
+/* Ambient equity curve along the bottom edge. Masked in from both sides so it
+   reads as a horizon rather than a chart, and kept behind the content. */
+.lnd-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: min(46vh, 380px);
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+}
+
+.lnd-horizon path { vector-effect: non-scaling-stroke; }
+
+.lnd-horizon-strat {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  stroke-opacity: .40;
+  stroke-linejoin: round;
+}
+
+.lnd-horizon-bench {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.25;
+  stroke-opacity: .22;
+  stroke-dasharray: 5 6;
+  stroke-linejoin: round;
+}
+
 .lnd-content {
   position: relative;
   z-index: 1;
@@ -273,43 +307,6 @@ body {
   to   { opacity: 1; transform: none; }
 }
 
-/* ── status line ── */
-.lnd-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--font-mono);
-  font-size: .7rem;
-  font-weight: 500;
-  letter-spacing: .16em;
-  color: var(--text-secondary);
-  margin-bottom: 26px;
-}
-
-.lnd-eyebrow-sep { color: var(--text-muted); }
-
-.lnd-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  flex: none;
-}
-
-.lnd-dot-live {
-  background: var(--primary);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent);
-  animation: lndPulse 2.4s ease-out infinite;
-}
-
-.lnd-dot-loading { background: var(--amber); }
-.lnd-dot-offline { background: var(--red); }
-
-@keyframes lndPulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 55%, transparent); }
-  70%  { box-shadow: 0 0 0 7px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
 
 /* ── headline ── */
 .lnd-title {
@@ -324,96 +321,24 @@ body {
 
 .lnd-thesis {
   font-family: var(--font-sans);
-  font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+  font-size: clamp(1.35rem, 3vw, 2rem);
   font-weight: 500;
-  line-height: 1.34;
-  letter-spacing: -.018em;
-  color: var(--text-primary);
-  margin: 0 0 20px;
-  max-width: 22ch;
-}
-
-.lnd-thesis em {
-  font-style: normal;
+  line-height: 1.28;
+  letter-spacing: -.022em;
   color: var(--primary);
+  margin: 0 0 22px;
+  max-width: 34ch;
+  text-wrap: balance;
 }
 
 .lnd-desc {
-  font-size: .93rem;
-  line-height: 1.72;
+  font-size: .95rem;
+  line-height: 1.75;
   color: var(--text-secondary);
-  max-width: 62ch;
-  margin: 0 0 44px;
+  max-width: 58ch;
+  margin: 0 0 52px;
 }
 
-/* ── medallion funnel ── */
-.lnd-funnel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
-  gap: 1px;
-  width: 100%;
-  background: var(--border-soft);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  margin-bottom: 40px;
-}
-
-.lnd-stage {
-  position: relative;
-  background: var(--bg-panel);
-  padding: 17px 18px 15px;
-  opacity: 0;
-  animation: lndRise .62s cubic-bezier(.22, .8, .3, 1) forwards;
-}
-
-/* Tier stripe — the medallion layer is encoded in colour, not just text. */
-.lnd-stage::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 2px;
-  background: var(--stage, var(--text-muted));
-}
-
-.lnd-stage-bronze    { --stage: #b87333; }
-.lnd-stage-silver    { --stage: #9aa6a3; }
-.lnd-stage-gold      { --stage: var(--gold); }
-.lnd-stage-warehouse { --stage: var(--primary); }
-
-.lnd-stage-tier {
-  font-family: var(--font-mono);
-  font-size: .58rem;
-  font-weight: 600;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--stage);
-  margin-bottom: 9px;
-}
-
-.lnd-stage-value {
-  font-family: var(--font-mono);
-  font-size: 1.5rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-.lnd-stage-label {
-  font-size: .76rem;
-  color: var(--text-secondary);
-  margin-top: 3px;
-}
-
-.lnd-stage-sub {
-  font-family: var(--font-mono);
-  font-size: .62rem;
-  color: var(--text-muted);
-  margin-top: 5px;
-  letter-spacing: .02em;
-}
 
 /* ── call to action ── */
 .lnd-cta {
@@ -477,12 +402,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lnd-content > *,
-  .lnd-stage {
+  .lnd-content > * {
     animation: none;
     opacity: 1;
   }
-  .lnd-dot-live { animation: none; }
 }
 
 @media (max-width: 640px) {

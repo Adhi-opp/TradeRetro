@@ -1,78 +1,72 @@
-import { useEffect, useState } from 'react';
 import { Sun, Moon, ArrowRight } from 'lucide-react';
 
-const API_BASE = 'http://localhost:8000';
-
-const fmt = (n) =>
-  n == null ? '—' : Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-
 /**
- * Live warehouse counters.
- *
- * The landing page used to be four static feature cards floating in whitespace
- * — it asserted the pipeline existed without showing it. These read the real
- * warehouse, so the first thing on screen is evidence the stack is up.
+ * Ambient horizon: a strategy curve against its benchmark, drawn once at
+ * module load and held still. It is the shape the product actually produces,
+ * so it carries the subject rather than decorating it, and it gives the lower
+ * half of the page something to sit on now that the stat cards are gone.
  */
-function useWarehouseStats() {
-  const [stats, setStats] = useState(null);
-  const [state, setState] = useState('loading'); // loading | live | offline
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/health/pipeline`, {
-          signal: AbortSignal.timeout(6000),
-        });
-        if (!res.ok) throw new Error(String(res.status));
-        const d = await res.json();
-        if (cancelled) return;
-        setStats(d);
-        setState('live');
-      } catch {
-        if (!cancelled) setState('offline');
-      }
-    };
-
-    load();
-    const iv = setInterval(load, 10000);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, []);
-
-  return { stats, state };
+function buildWalk(seed, n, drift, start) {
+  let s = seed;
+  const rnd = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const pts = [];
+  let v = start;
+  for (let i = 0; i < n; i += 1) {
+    v += (rnd() - drift) * 0.055;
+    v = Math.max(0.06, Math.min(0.94, v));
+    pts.push([(i / (n - 1)) * 1440, 320 - v * 320]);
+  }
+  return pts;
 }
 
-/** One stage of the medallion funnel: raw ticks narrowing into daily bars. */
-function Stage({ tier, value, label, sub, delay }) {
+/** Quadratic midpoint smoothing, so the walk reads as a price series. */
+function toPath(pts) {
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i += 1) {
+    const [x0, y0] = pts[i];
+    const [x1, y1] = pts[i + 1];
+    d += ` Q${x0.toFixed(1)} ${y0.toFixed(1)} ${((x0 + x1) / 2).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L${last[0].toFixed(1)} ${last[1].toFixed(1)}`;
+  return d;
+}
+
+const STRATEGY = toPath(buildWalk(20180101, 96, 0.455, 0.34));
+const BENCHMARK = toPath(buildWalk(77447731, 96, 0.44, 0.30));
+
+function Horizon() {
   return (
-    <div className={`lnd-stage lnd-stage-${tier}`} style={{ animationDelay: `${delay}ms` }}>
-      <div className="lnd-stage-tier">{tier}</div>
-      <div className="lnd-stage-value">{value}</div>
-      <div className="lnd-stage-label">{label}</div>
-      {sub && <div className="lnd-stage-sub">{sub}</div>}
-    </div>
+    <svg
+      className="lnd-horizon"
+      viewBox="0 0 1440 320"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id="lnd-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${BENCHMARK} L1440 320 L0 320 Z`} fill="none" />
+      <path className="lnd-horizon-bench" d={BENCHMARK} />
+      <path d={`${STRATEGY} L1440 320 L0 320 Z`} fill="url(#lnd-fill)" stroke="none" />
+      <path className="lnd-horizon-strat" d={STRATEGY} />
+    </svg>
   );
 }
 
 export default function Landing({ onEnter, theme, onToggleTheme }) {
-  const { stats, state } = useWarehouseStats();
-
-  const bronze = stats?.bronze?.rows;
-  const silver = stats?.silver?.bars;
-  const gold = stats?.gold_5min?.bars;
-  const warehouse = stats?.raw?.rows;
-  const rate = stats?.bronze?.ticks_per_minute ?? 0;
-  const instruments = stats?.bronze?.instruments;
-  const tickers = stats?.raw?.tickers;
-  // The simulator and the real producer both stand down outside the NSE
-  // stream window, so a zero rate while connected means idle, not broken.
-  const ingesting = state === 'live' && rate > 0;
-
   return (
     <div className="lnd">
       <div className="lnd-grid" aria-hidden="true" />
       <div className="lnd-glow" aria-hidden="true" />
+      <Horizon />
 
       <button
         className="theme-toggle landing-theme-toggle"
@@ -83,47 +77,26 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
       </button>
 
       <main className="lnd-content">
-        <div className="lnd-eyebrow" style={{ animationDelay: '60ms' }}>
-          <span className={`lnd-dot lnd-dot-${ingesting ? 'live' : state}`} />
-          {state === 'loading' && 'CONNECTING'}
-          {state === 'offline' && 'ENGINE OFFLINE'}
-          {state === 'live' && (ingesting ? `INGESTING ${fmt(rate)}/min` : 'WAREHOUSE ONLINE · MARKET CLOSED')}
-          <span className="lnd-eyebrow-sep">/</span>
-          {tickers ? `${tickers} INSTRUMENTS` : 'NSE EQUITIES'}
-        </div>
-
-        <h1 className="lnd-title" style={{ animationDelay: '120ms' }}>
+        <h1 className="lnd-title" style={{ animationDelay: '60ms' }}>
           TradeRetro
         </h1>
 
-        <p className="lnd-thesis" style={{ animationDelay: '200ms' }}>
-          Most retail strategies don’t lose to the market.
-          <br />
-          <em>They lose to costs.</em>
+        <p className="lnd-thesis" style={{ animationDelay: '150ms' }}>
+          See what your strategy actually kept.
         </p>
 
-        <p className="lnd-desc" style={{ animationDelay: '280ms' }}>
-          A streaming NSE data warehouse and an event-driven backtester that charges
-          every fill the real Indian cost stack — STT, brokerage, GST, stamp duty and
-          slippage — so a strategy’s edge is measured after the friction that removes it.
+        <p className="lnd-desc" style={{ animationDelay: '240ms' }}>
+          Ten years of NSE prices behind a streaming warehouse, and a backtest engine
+          that pays STT, brokerage, GST, stamp duty and slippage on every fill.
+          No frictionless maths, no trading on tomorrow&rsquo;s close.
         </p>
 
-        <div className="lnd-funnel" style={{ animationDelay: '360ms' }}>
-          <Stage
-            tier="bronze" value={fmt(bronze)} label="raw ticks"
-            sub={instruments ? `${instruments} instruments` : null} delay={380}
-          />
-          <Stage tier="silver" value={fmt(silver)} label="1-min OHLCV" sub="deduped · gap-healed" delay={430} />
-          <Stage tier="gold" value={fmt(gold)} label="5-min rollup" sub="continuous aggregate" delay={480} />
-          <Stage tier="warehouse" value={fmt(warehouse)} label="EOD bars" sub="10 years, quality-gated" delay={530} />
-        </div>
-
-        <button className="lnd-cta" onClick={onEnter} style={{ animationDelay: '600ms' }}>
+        <button className="lnd-cta" onClick={onEnter} style={{ animationDelay: '340ms' }}>
           <span>Launch Terminal</span>
           <ArrowRight size={17} />
         </button>
 
-        <div className="lnd-foot" style={{ animationDelay: '680ms' }}>
+        <div className="lnd-foot" style={{ animationDelay: '430ms' }}>
           <span>TimescaleDB</span>
           <span>Redis Streams</span>
           <span>Prefect</span>
