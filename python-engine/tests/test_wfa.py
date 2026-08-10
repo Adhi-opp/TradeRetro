@@ -6,6 +6,8 @@ synthetic data to prove the train→test→stitch pipeline holds together and th
 efficiency ratio / verdict come out sane.
 """
 
+import pytest
+
 from engine.wfa import generate_folds, run_wfa, strategy_warmup
 
 
@@ -123,5 +125,51 @@ class TestRunWFA:
             self._candidates(), 252, 63, "sharpe",
         )
         s = result["summary"]
-        assert s["verdict"] in ("robust", "marginal", "overfit", "n/a")
+        assert s["verdict"] in ("robust", "marginal", "overfit", "inconclusive")
+
+    def test_summary_reports_active_vs_idle_folds(self):
+        """
+        Folds with no OOS trades are flat cash and must be excluded from the
+        efficiency ratio, but still counted so the exclusion is visible.
+        """
+        data = _trend_market(900)
+        result = run_wfa(
+            data, 90, "MOVING_AVERAGE_CROSSOVER", {"initialCapital": 100_000},
+            self._candidates(), 252, 63, "sharpe",
+        )
+        s = result["summary"]
+
+        assert s["activeFolds"] + s["idleFolds"] == s["folds"]
+        assert s["activeFolds"] == sum(1 for f in result["folds"] if f["oosTrades"] > 0)
+        assert all(f["active"] == (f["oosTrades"] > 0) for f in result["folds"])
+
+    def test_efficiency_is_mean_oos_over_mean_is_on_active_folds(self):
+        data = _trend_market(900)
+        result = run_wfa(
+            data, 90, "MOVING_AVERAGE_CROSSOVER", {"initialCapital": 100_000},
+            self._candidates(), 252, 63, "sharpe",
+        )
+        s = result["summary"]
+        if s["wfaEfficiency"] is None:
+            pytest.skip("no positive in-sample edge in this fixture")
+
+        active = [f for f in result["folds"] if f["active"] and f["oosMetric"] is not None]
+        mean_is = sum(f["isMetric"] for f in active) / len(active)
+        mean_oos = sum(f["oosMetric"] for f in active) / len(active)
+
+        assert s["meanInSample"] == pytest.approx(mean_is, abs=1e-3)
+        assert s["meanOutOfSample"] == pytest.approx(mean_oos, abs=1e-3)
+        assert s["wfaEfficiency"] == pytest.approx(mean_oos / mean_is, abs=1e-2)
+
+    def test_realized_oos_performance_is_reported_alongside_the_ratio(self):
+        """A negative verdict must never hide a positive realized OOS result."""
+        data = _trend_market(900)
+        result = run_wfa(
+            data, 90, "MOVING_AVERAGE_CROSSOVER", {"initialCapital": 100_000},
+            self._candidates(), 252, 63, "sharpe",
+        )
+        s = result["summary"]
+        for key in ("oosTotalReturn", "oosMaxDrawdown", "oosSharpe"):
+            assert key in s and s[key] is not None
+        assert s["oosMaxDrawdown"] <= 0
         assert "wfaEfficiency" in s

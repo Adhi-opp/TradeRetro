@@ -27,3 +27,7 @@ pgdata/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# coverage
+.coverage
+htmlcov/

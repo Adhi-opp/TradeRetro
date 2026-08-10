@@ -18,10 +18,20 @@ class BacktestMetrics(BaseModel):
     totalReturnRupee: float
     buyHoldReturn: float
     sharpeRatio: float
+    sortinoRatio: float
+    calmarRatio: float
+    annualizedReturn: float
+    annualizedVolatility: float
+    downsideDeviation: float
+    var95Daily: float
     maxDrawdown: float
     cagr: float
     benchmarkCagr: float
-    alpha: float
+    excessCagr: float
+    alpha: float               # deprecated mirror of excessCagr
+    jensensAlpha: float
+    beta: float
+    betaRSquared: float
     informationRatio: float
     totalTrades: int
     winningTrades: int
@@ -36,14 +46,29 @@ class BacktestMetrics(BaseModel):
 
 
 class GrossMetrics(BaseModel):
+    """
+    Mirrors every field the UI swaps in when the cost toggle is off. Missing
+    keys silently fall through to the net metric, so this model is the
+    contract that prevents a mixed net/gross header.
+    """
     finalValue: float
     totalReturn: float
     totalReturnRupee: float
     maxDrawdown: float
     cagr: float
-    alpha: float
+    excessCagr: float
+    alpha: float               # deprecated mirror of excessCagr
     winRate: float
     winningTrades: int
+    losingTrades: int
+    sharpeRatio: float
+    sortinoRatio: float
+    calmarRatio: float
+    annualizedReturn: float
+    annualizedVolatility: float
+    downsideDeviation: float
+    var95Daily: float
+    informationRatio: float
 
 
 class CostBreakdown(BaseModel):
@@ -77,7 +102,9 @@ class TradeRecord(BaseModel):
     grossProfitLoss: float
     pnlPct: float
     holdingPeriod: int
-    fee: float
+    fee: float                 # round trip: entryFee + exitFee
+    entryFee: float
+    exitFee: float
     isWin: bool
     isGrossWin: bool
     forceClose: bool

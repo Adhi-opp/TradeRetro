@@ -303,3 +303,87 @@ class TestRiskModel:
         data = _crossover_market()
         result = SimulationEngine(data, 100_000, self._MA_CONFIG).run()
         assert all(t["exitReason"] != "stop" for t in result["trades"])
+
+
+class TestTradeAccounting:
+    """
+    Regression guard for ENG-02 / ENG-03.
+
+    Every rupee that leaves the account must show up in exactly one trade
+    record. The engine used to charge buy-side fees to cash but omit them
+    from trade.profitLoss, and to leave the final equity point marked to
+    market instead of restating it after the force-close sell. Either bug
+    breaks the same invariant:
+
+        sum(trade.profitLoss) == finalValue - initialCapital
+    """
+
+    CONFIGS = [
+        {"strategyType": "MOVING_AVERAGE_CROSSOVER",
+         "params": {"shortPeriod": 5, "longPeriod": 20, "initialCapital": 100_000, "seed": 42}},
+        {"strategyType": "RSI",
+         "params": {"rsiPeriod": 14, "oversold": 30, "overbought": 70,
+                    "initialCapital": 100_000, "seed": 42}},
+        {"strategyType": "MACD",
+         "params": {"initialCapital": 100_000, "seed": 42}},
+        {"strategyType": "MOVING_AVERAGE_CROSSOVER",
+         "params": {"shortPeriod": 5, "longPeriod": 20, "initialCapital": 100_000,
+                    "seed": 42, "riskPct": 0.02, "stopLossPct": 0.05}},
+    ]
+
+    @pytest.mark.parametrize("config", CONFIGS)
+    @pytest.mark.parametrize("market", ["crossover", "crash", "rising"])
+    def test_trade_pnl_reconciles_with_equity_curve(self, config, market):
+        data = {"crossover": _crossover_market, "crash": _crash_market,
+                "rising": _rising_market}[market]()
+        result = SimulationEngine(data, 100_000, config).run()
+
+        if not result["trades"]:
+            pytest.skip("no trades generated for this combination")
+
+        booked = sum(t["profitLoss"] for t in result["trades"])
+        realised = result["metrics"]["finalValue"] - result["metrics"]["initialCapital"]
+        assert booked == pytest.approx(realised, abs=1e-6), (
+            f"{len(result['trades'])} trades book Rs {booked:,.2f} but the equity "
+            f"curve realised Rs {realised:,.2f} — costs are being double-counted "
+            f"or dropped"
+        )
+
+    def test_trade_fee_is_the_full_round_trip(self):
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self.CONFIGS[0]).run()
+        assert result["trades"], "expected at least one trade"
+
+        for t in result["trades"]:
+            assert t["entryFee"] > 0, "buy leg must carry a fee"
+            assert t["exitFee"] > 0, "sell leg must carry a fee"
+            assert t["fee"] == pytest.approx(t["entryFee"] + t["exitFee"])
+            assert t["profitLoss"] == pytest.approx(t["grossProfitLoss"] - t["fee"])
+
+    def test_fees_booked_to_trades_match_total_costs(self):
+        """Every modelled cost lands on a trade — none is stranded."""
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self.CONFIGS[0]).run()
+        booked_fees = sum(t["fee"] for t in result["trades"])
+        assert booked_fees == pytest.approx(
+            result["costBreakdown"]["totalCosts"], abs=0.02
+        )
+
+    def test_force_close_pays_its_exit_cost(self):
+        """
+        A run that ends holding a position must restate the last equity point
+        after the force-close sell, otherwise finalValue is marked to market
+        and skips the closing costs.
+        """
+        # The crossover fixture ends mid-recovery, so the position is still
+        # open when the data runs out.
+        data = _crossover_market()
+        result = SimulationEngine(data, 100_000, self.CONFIGS[0]).run()
+
+        closes = [t for t in result["trades"] if t["exitReason"] == "force_close"]
+        assert closes, "expected the final position to be force-closed"
+
+        last = result["equityCurve"][-1]
+        assert last["holdings"] == 0
+        assert last["equity"] == pytest.approx(last["cash"])
+        assert result["metrics"]["finalValue"] == pytest.approx(last["equity"])

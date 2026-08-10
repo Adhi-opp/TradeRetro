@@ -80,6 +80,7 @@ class SimulationEngine:
         self.holdings = 0
         self.entry_price = None
         self.entry_date = None
+        self.entry_costs = 0.0  # round-trip accounting: fees paid on the way in
         self.stop_price = None  # active stop level while holding (risk model)
 
         # Results tracking
@@ -158,10 +159,18 @@ class SimulationEngine:
                 pending_signal = "SELL"
 
         # Force close remaining position at the last available close (no next
-        # bar to open into).
+        # bar to open into). The final equity point was recorded *before* this
+        # sell, so it still marks the position to market without paying the
+        # exit leg — restate it, otherwise finalValue (and every metric derived
+        # from it) silently omits the closing costs.
         if self.holdings > 0:
             last = self.visible_market_data[-1]
             self._execute_sell(last["close"], last["date"], exit_reason="force_close")
+            if self.equity_curve:
+                self.equity_curve[-1]["equity"] = self.cash
+                self.equity_curve[-1]["grossEquity"] = self.cash + self.total_costs["grossTotal"]
+                self.equity_curve[-1]["cash"] = self.cash
+                self.equity_curve[-1]["holdings"] = 0
 
         return self._generate_report()
 
@@ -282,6 +291,12 @@ class SimulationEngine:
         self.holdings = max_shares
         self.entry_price = price
         self.entry_date = date
+        # Remember the entry leg's fees so the closing trade record can charge
+        # the FULL round trip, not just the exit. Without this, per-trade P&L
+        # silently omits buy-side STT, stamp duty, brokerage and slippage —
+        # which the equity curve already paid — and every trade-derived
+        # statistic (profit factor, expectancy, win rate) reads optimistic.
+        self.entry_costs = costs["total"]
         # Arm the stop for this position (risk model only).
         self.stop_price = price * (1 - self.stop_loss_pct) if self.risk_managed else None
 
@@ -299,7 +314,14 @@ class SimulationEngine:
 
         costs = calculate_indian_costs(proceeds, "SELL", self.rng)
         net_proceeds = proceeds - costs["total"]
-        total_fee = costs["total"]
+
+        # Round-trip fee: entry leg + exit leg. Both were charged to cash, so
+        # both belong in the trade's P&L — this keeps
+        #     sum(trade.profitLoss) == finalValue - initialCapital
+        # exactly true (asserted in tests/test_simulation.py).
+        entry_fee = self.entry_costs
+        exit_fee = costs["total"]
+        total_fee = entry_fee + exit_fee
 
         # Accumulate costs
         for key in ("stt", "brokerage", "slippage", "exchangeTxn", "gst"):
@@ -322,7 +344,9 @@ class SimulationEngine:
             "grossProfitLoss": gross_profit_loss,
             "pnlPct": pnl_pct,
             "holdingPeriod": holding_period,
-            "fee": total_fee,
+            "fee": total_fee,        # round trip: entry + exit
+            "entryFee": entry_fee,
+            "exitFee": exit_fee,
             "isWin": profit_loss > 0,
             "isGrossWin": gross_profit_loss > 0,
             "forceClose": exit_reason == "force_close",
@@ -333,6 +357,7 @@ class SimulationEngine:
         self.holdings = 0
         self.entry_price = None
         self.entry_date = None
+        self.entry_costs = 0.0
         self.stop_price = None
 
     def _portfolio_value(self, candle: dict) -> float:
@@ -369,6 +394,7 @@ class SimulationEngine:
     def _generate_report(self) -> dict:
         """Generate the final report matching SimulationEngine.js output exactly."""
         equity_values = np.array([p["equity"] for p in self.equity_curve], dtype=np.float64)
+        gross_equity_values = np.array([p["grossEquity"] for p in self.equity_curve], dtype=np.float64)
         close_prices = np.array([c["close"] for c in self.visible_market_data], dtype=np.float64)
 
         final_value = self.equity_curve[-1]["equity"] if self.equity_curve else self.initial_capital
@@ -404,6 +430,7 @@ class SimulationEngine:
         strategy_cagr = m.cagr(self.initial_capital, final_value, n)
         bench_cagr = m.benchmark_cagr(initial_price, final_price, n)
         gross_cagr = (pow(gross_final_value / self.initial_capital, 1 / years) - 1) * 100 if years > 0 else 0
+        jensen = m.jensens_alpha(equity_values, close_prices)
 
         # Serialize dates as strings
         def _date_str(d) -> str:
@@ -440,10 +467,21 @@ class SimulationEngine:
                 "totalReturnRupee": final_value - self.initial_capital,
                 "buyHoldReturn": buy_hold_return,
                 "sharpeRatio": m.sharpe_ratio(equity_values),
+                "sortinoRatio": m.sortino_ratio(equity_values),
+                "calmarRatio": m.calmar_ratio(strategy_cagr, self.max_drawdown * 100),
+                "annualizedReturn": m.annualized_return(equity_values),
+                "annualizedVolatility": m.annualized_volatility(equity_values),
+                "downsideDeviation": m.downside_deviation(equity_values) * 100,
+                "var95Daily": m.value_at_risk(equity_values),
                 "maxDrawdown": self.max_drawdown * 100,
                 "cagr": strategy_cagr,
                 "benchmarkCagr": bench_cagr,
-                "alpha": m.alpha(strategy_cagr, bench_cagr),
+                # Plain return spread — NOT Jensen's alpha. See metrics.excess_cagr.
+                "excessCagr": m.excess_cagr(strategy_cagr, bench_cagr),
+                "alpha": m.excess_cagr(strategy_cagr, bench_cagr),  # deprecated mirror
+                "jensensAlpha": jensen["alpha"],
+                "beta": jensen["beta"],
+                "betaRSquared": jensen["rSquared"],
                 "informationRatio": m.information_ratio(equity_values, close_prices),
                 "totalTrades": num_trades,
                 "winningTrades": winning_trades,
@@ -456,15 +494,29 @@ class SimulationEngine:
                 "endDate": _date_str(self.visible_market_data[-1]["date"]),
                 "totalDays": n,
             },
+            # Every key the UI reads in "gross" mode must exist here. Any key
+            # that is missing falls through to the NET value and the header
+            # then shows a gross return beside a net Sharpe with nothing
+            # marking the difference.
             "grossMetrics": {
                 "finalValue": gross_final_value,
                 "totalReturn": gross_total_return,
                 "totalReturnRupee": gross_final_value - self.initial_capital,
                 "maxDrawdown": self.gross_max_drawdown * 100,
                 "cagr": gross_cagr,
-                "alpha": gross_cagr - bench_cagr,
+                "excessCagr": gross_cagr - bench_cagr,
+                "alpha": gross_cagr - bench_cagr,  # deprecated mirror
                 "winRate": gross_win_rate,
                 "winningTrades": gross_winning_trades,
+                "losingTrades": num_trades - gross_winning_trades,
+                "sharpeRatio": m.sharpe_ratio(gross_equity_values),
+                "sortinoRatio": m.sortino_ratio(gross_equity_values),
+                "calmarRatio": m.calmar_ratio(gross_cagr, self.gross_max_drawdown * 100),
+                "annualizedReturn": m.annualized_return(gross_equity_values),
+                "annualizedVolatility": m.annualized_volatility(gross_equity_values),
+                "downsideDeviation": m.downside_deviation(gross_equity_values) * 100,
+                "var95Daily": m.value_at_risk(gross_equity_values),
+                "informationRatio": m.information_ratio(gross_equity_values, close_prices),
             },
             "costBreakdown": {
                 "stt": _js_round2(self.total_costs["stt"]),
