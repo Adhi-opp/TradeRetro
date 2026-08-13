@@ -12,6 +12,14 @@ export default function CopilotPanel() {
   const [exiting, setExiting] = useState(false);
   const prevHasMsgs = useRef(hasMessages);
 
+  const modelsLoaded = useAIStore((s) => s.modelsLoaded);
+  const modelsError = useAIStore((s) => s.modelsError);
+  const loadModels = useAIStore((s) => s.loadModels);
+
+  useEffect(() => {
+    if (panelOpen && (!modelsLoaded || modelsError)) loadModels();
+  }, [panelOpen, modelsLoaded, modelsError, loadModels]);
+
   useEffect(() => {
     if (hasMessages && !prevHasMsgs.current) {
       setExiting(true);

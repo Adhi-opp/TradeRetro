@@ -68,7 +68,7 @@ const useAIStore = create((set, get) => ({
   setSelectedModel: (model) => set({ selectedModel: model }),
 
   loadModels: async () => {
-    if (get().modelsLoading || get().modelsLoaded) return;
+    if (get().modelsLoading) return;
     set({ modelsLoading: true, modelsError: null });
     try {
       const data = await fetchModels();
@@ -81,9 +81,12 @@ const useAIStore = create((set, get) => ({
     } catch (err) {
       set({
         modelsLoading: false,
-        modelsLoaded: true,
+        modelsLoaded: false,
         modelsError: err?.message || 'Failed to load models',
       });
+      setTimeout(() => {
+        if (!get().modelsLoaded) get().loadModels();
+      }, 3000);
     }
   },
 
