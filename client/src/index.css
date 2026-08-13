@@ -10669,6 +10669,11 @@ html, body, #root {
     background: rgba(0, 0, 0, 0.3);
     z-index: 99;
   }
+
+  /* Keep the sidebar rail above the scrim so rail navigation stays clickable */
+  .ai-panel-visible .app-sidebar-v2 {
+    z-index: 101 !important;
+  }
 }
 
 /* ── Responsive: Mobile fullscreen ────────────────────────── */
