@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Terminal, ChevronDown, ChevronRight } from 'lucide-react';
+import { Terminal, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Trophy, ShieldAlert, Activity, Percent, Newspaper, Compass, AlertTriangle } from 'lucide-react';
 import useBacktestStore from '../store/useBacktestStore';
 import { analyze } from '../utils/performance';
 import KpiRibbon from './KpiRibbon';
@@ -29,19 +29,139 @@ function LoadingState() {
 
 function IdleState({ error }) {
   return (
-    <div className="tearsheet-idle">
-      <Terminal size={42} />
-      {error ? (
-        <>
-          <p className="idle-title" style={{ color: 'var(--red)' }}>{error}</p>
-          <p className="idle-desc">Check the configuration above and run again.</p>
-        </>
-      ) : (
-        <>
-          <p className="idle-title">Awaiting Strategy Execution</p>
-          <p className="idle-desc">Configure a strategy above and hit <strong>Run Backtest</strong>.</p>
-        </>
-      )}
+    <div className="terminal-idle-dashboard">
+      {/* 1. Market Overview Label */}
+      <div className="section-label-bar">
+        <h3>Market Overview</h3>
+      </div>
+
+      {/* 2. Live Market Cards */}
+      <div className="kpi-ribbon idle-market-ribbon">
+        <div className="kpi">
+          <div className="kpi-top">
+            <span className="kpi-icon-wrapper"><Trophy size={16} /></span>
+            <span className="kpi-badge">BULLISH</span>
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">NIFTY 50</div>
+            <div className="kpi-value pos">24,320.50</div>
+          </div>
+          <div className="kpi-footer">
+            <span className="kpi-trend pos"><TrendingUp size={12} /> +120.40</span>
+            <span className="kpi-sub">(+0.50%)</span>
+          </div>
+        </div>
+
+        <div className="kpi">
+          <div className="kpi-top">
+            <span className="kpi-icon-wrapper"><ShieldAlert size={16} /></span>
+            <span className="kpi-badge">LOW VOL</span>
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">INDIA VIX</div>
+            <div className="kpi-value neg">12.45</div>
+          </div>
+          <div className="kpi-footer">
+            <span className="kpi-trend neg"><TrendingDown size={12} /> -0.35</span>
+            <span className="kpi-sub">(-2.73%)</span>
+          </div>
+        </div>
+
+        <div className="kpi">
+          <div className="kpi-top">
+            <span className="kpi-icon-wrapper"><Activity size={16} /></span>
+            <span className="kpi-badge">STABLE</span>
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">BANK NIFTY</div>
+            <div className="kpi-value pos">52,450.20</div>
+          </div>
+          <div className="kpi-footer">
+            <span className="kpi-trend pos"><TrendingUp size={12} /> +450.80</span>
+            <span className="kpi-sub">(+0.87%)</span>
+          </div>
+        </div>
+
+        <div className="kpi">
+          <div className="kpi-top">
+            <span className="kpi-icon-wrapper"><Percent size={16} /></span>
+            <span className="kpi-badge">VOLATILE</span>
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">NIFTY IT</div>
+            <div className="kpi-value neg">39,120.10</div>
+          </div>
+          <div className="kpi-footer">
+            <span className="kpi-trend neg"><TrendingDown size={12} /> -150.30</span>
+            <span className="kpi-sub">(-0.38%)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Central Backtest Console (Empty State Placement) */}
+      <div className="panel idle-terminal-console">
+        <div className="console-icon">
+          {error ? <AlertTriangle size={32} color="var(--red)" /> : <Activity size={32} color="var(--primary)" />}
+        </div>
+        {error ? (
+          <div className="console-text">
+            <h4 style={{ color: 'var(--red)' }}>Backtest Error Encountered</h4>
+            <p>{error}. Please adjust the parameter thresholds or time frames above and click Execute Backtest to retry.</p>
+          </div>
+        ) : (
+          <div className="console-text">
+            <h4>Awaiting Strategy Execution</h4>
+            <p>Configure parameters on the builder panel above and click <strong>Execute Backtest</strong>. Historical returns, drawdown metrics, and trades will populate here.</p>
+          </div>
+        )}
+      </div>
+
+      {/* 4. Macro Feed & Cross Asset Insights */}
+      <div className="ts-row ts-row-5050 idle-bottom-row">
+        {/* Macro Feed */}
+        <div className="ts-cell ts-cell-50 panel">
+          <div className="panel-title-row">
+            <span className="panel-title-icon"><Newspaper size={14} /></span>
+            <span className="panel-title">Macro Feed</span>
+          </div>
+          <div className="macro-news-list">
+            <div className="macro-news-item">
+              <span className="news-time">10:15 IST</span>
+              <span className="news-content">US CPI inflation eases to 3.0%, bolstering expectation for rate cuts.</span>
+            </div>
+            <div className="macro-news-item">
+              <span className="news-time">09:45 IST</span>
+              <span className="news-content">NSE cash volumes increase by 14% as midcaps regain momentum.</span>
+            </div>
+            <div className="macro-news-item">
+              <span className="news-time">09:00 IST</span>
+              <span className="news-content">Crude oil prices hover near $82 per barrel amid global geopolitical signals.</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cross Asset Insights */}
+        <div className="ts-cell ts-cell-50 panel">
+          <div className="panel-title-row">
+            <span className="panel-title-icon"><Compass size={14} /></span>
+            <span className="panel-title">Cross Asset Insights</span>
+          </div>
+          <div className="cross-asset-list">
+            <div className="ca-insight-row">
+              <span className="ca-label">USDINR Correlation</span>
+              <span className="ca-value neg">-0.65</span>
+            </div>
+            <div className="ca-insight-row">
+              <span className="ca-label">Gold vs Equities</span>
+              <span className="ca-value pos">+0.12</span>
+            </div>
+            <div className="ca-insight-row">
+              <span className="ca-label">Nifty 50 vs S&P 500</span>
+              <span className="ca-value pos">+0.78</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -16,7 +16,6 @@ function CustomTooltip({ active, payload, label }) {
   const formatted = date.toLocaleDateString('en-IN', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
-  // Show strategy + B&H + gap on hover
   const strategy = payload.find((e) => e.dataKey === 'displayEquity');
   const buyHold = payload.find((e) => e.dataKey === 'buyHold');
   const gap = strategy && buyHold ? strategy.value - buyHold.value : null;
@@ -33,7 +32,7 @@ function CustomTooltip({ active, payload, label }) {
         </div>
       ))}
       {gap !== null && (
-        <div style={{ color: gap >= 0 ? '#22c55e' : '#ef4444', marginTop: 4, fontWeight: 600 }}>
+        <div style={{ color: gap >= 0 ? 'var(--green)' : 'var(--red)', marginTop: 4, fontWeight: 600 }}>
           Gap: {gap >= 0 ? '+' : ''}₹{Math.abs(gap).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
         </div>
       )}
@@ -55,7 +54,6 @@ const formatINR = (n) =>
 export default function EquityChart({ data, showCosts = true }) {
   const equityKey = showCosts ? 'equity' : 'grossEquity';
 
-  // useMemo must run unconditionally — handle empty data inside the hook
   const { chartData, summary } = useMemo(() => {
     if (!data || data.length === 0) {
       return { chartData: [], summary: null };
@@ -89,17 +87,17 @@ export default function EquityChart({ data, showCosts = true }) {
   return (
     <div className="panel">
       <div className="panel-title-row">
-        <span className="panel-title">Equity Curve vs Buy &amp; Hold</span>
+        <span className="panel-title">Equity Curve Analysis</span>
         <div className="equity-summary-row">
           <span className="equity-summary-chip">
             <span className="equity-summary-label">Strategy</span>
-            <span className="equity-summary-value" style={{ color: '#22c55e' }}>
+            <span className="equity-summary-value" style={{ color: 'var(--primary)' }}>
               {formatINR(summary.finalEquity)} <small>{formatPct(summary.stratPct)}</small>
             </span>
           </span>
           <span className="equity-summary-chip">
             <span className="equity-summary-label">Buy &amp; Hold</span>
-            <span className="equity-summary-value" style={{ color: '#6366f1' }}>
+            <span className="equity-summary-value" style={{ color: 'var(--text-secondary)' }}>
               {formatINR(summary.finalBuyHold)} <small>{formatPct(summary.bhPct)}</small>
             </span>
           </span>
@@ -112,17 +110,17 @@ export default function EquityChart({ data, showCosts = true }) {
       <div className="chart-wrapper">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e2736" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#475569"
+              stroke="var(--text-muted)"
               tickFormatter={formatXAxis}
               minTickGap={40}
               tickMargin={10}
               fontSize={11}
             />
             <YAxis
-              stroke="#475569"
+              stroke="var(--text-muted)"
               domain={['auto', 'auto']}
               width={80}
               tickFormatter={formatYAxis}
@@ -140,21 +138,21 @@ export default function EquityChart({ data, showCosts = true }) {
               name="Buy & Hold"
               type="monotone"
               dataKey="buyHold"
-              stroke="#6366f1"
+              stroke="var(--text-secondary)"
               strokeWidth={1.75}
               strokeDasharray="6 3"
               dot={false}
-              activeDot={{ r: 4, fill: '#6366f1', stroke: '#080c12', strokeWidth: 2 }}
+              activeDot={{ r: 4, fill: 'var(--text-secondary)', stroke: '#090909', strokeWidth: 2 }}
               isAnimationActive={false}
             />
             <Line
               name={showCosts ? 'Strategy (Net)' : 'Strategy (Gross)'}
               type="monotone"
               dataKey="displayEquity"
-              stroke="#22c55e"
+              stroke="var(--primary)"
               strokeWidth={2.25}
               dot={false}
-              activeDot={{ r: 5, fill: '#22c55e', stroke: '#080c12', strokeWidth: 2 }}
+              activeDot={{ r: 5, fill: 'var(--primary)', stroke: '#090909', strokeWidth: 2 }}
               isAnimationActive={false}
             />
           </LineChart>

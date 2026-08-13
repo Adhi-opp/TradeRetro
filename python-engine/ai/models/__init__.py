@@ -1,0 +1,3 @@
+"""
+AI Module Pydantic Models
+"""

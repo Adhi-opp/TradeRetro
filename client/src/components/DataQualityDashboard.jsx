@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, AlertCircle, CheckCircle, Clock, TrendingUp, Layers, Activity } from 'lucide-react';
+import { RefreshCw, AlertCircle, CheckCircle, Clock, Layers, Database, SearchX } from 'lucide-react';
 
 const API = 'http://localhost:8000/api';
 
@@ -34,7 +34,7 @@ function QualityWarnings() {
     return () => clearInterval(iv);
   }, [fetchAudit]);
 
-  if (err) return <div className="dq-error">Quality audit: {err}</div>;
+  if (err) return <div className="dq-error-panel"><AlertCircle size={16} /><strong>Quality audit unavailable</strong><span>Start the FastAPI service and refresh to load audit checks.</span></div>;
   if (!audit) return null;
 
   const { summary, results } = audit;
@@ -113,7 +113,7 @@ function MedallionHealth() {
     return () => clearInterval(iv);
   }, [fetchSnap]);
 
-  if (err) return <div className="dq-error">Pipeline health: {err}</div>;
+  if (err) return <div className="dq-error-panel"><AlertCircle size={16} /><strong>Pipeline health unavailable</strong><span>Live medallion health cannot be reached while the API is offline.</span></div>;
   if (!snap) return <div className="dq-empty">Loading pipeline health…</div>;
 
   const tickRate = snap.bronze?.ticks_per_minute ?? 0;
@@ -204,6 +204,40 @@ function PercentBar({ percent, label = '' }) {
   );
 }
 
+function FriendlyError({ title = 'Data service unavailable', message, onRetry }) {
+  return (
+    <div className="dq-state-panel dq-state-error" role="alert">
+      <AlertCircle size={22} />
+      <div>
+        <strong>{title}</strong>
+        <span>{message || 'The API did not respond. Start the FastAPI service, then refresh this panel.'}</span>
+      </div>
+      {onRetry && (
+        <button className="dq-state-action" onClick={onRetry}>
+          <RefreshCw size={14} /> Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyInventory({ onRetry }) {
+  return (
+    <tr>
+      <td colSpan="7">
+        <div className="dq-empty-inventory">
+          <SearchX size={22} />
+          <strong>No tickers in inventory</strong>
+          <span>Add symbols from the Backtest Engine or run a backfill to populate coverage, freshness, and quality metrics.</span>
+          <button className="dq-state-action" onClick={onRetry}>
+            <Database size={14} /> Refresh Inventory
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function DataQualityDashboard() {
   const [universe, setUniverse] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -285,7 +319,12 @@ export default function DataQualityDashboard() {
         </button>
       </div>
 
-      {error && <div className="dq-error">Error: {error}</div>}
+      {error && (
+        <FriendlyError
+          message="Universe, coverage, and freshness metrics are temporarily unavailable."
+          onRetry={fetchUniverse}
+        />
+      )}
 
       <MedallionHealth />
       <QualityWarnings />
@@ -308,7 +347,7 @@ export default function DataQualityDashboard() {
         <div className="dq-stat-card">
           <div className="dq-stat-label">Freshness</div>
           <div className="dq-stat-value">
-            {stats.daysSinceMostRecent !== null ? `${stats.daysSinceMostRecent}d ago` : 'N/A'}
+            {stats.daysSinceMostRecent != null ? `${stats.daysSinceMostRecent}d ago` : 'N/A'}
           </div>
           <div className="dq-stat-hint">Most recent backfill</div>
         </div>
@@ -339,6 +378,16 @@ export default function DataQualityDashboard() {
               </tr>
             </thead>
             <tbody>
+              {sortedUniverse.length === 0 && !loading && <EmptyInventory onRetry={fetchUniverse} />}
+              {loading && sortedUniverse.length === 0 && (
+                <tr>
+                  <td colSpan="7">
+                    <div className="dq-table-skeleton">
+                      <span /><span /><span />
+                    </div>
+                  </td>
+                </tr>
+              )}
               {sortedUniverse.map((t) => {
                 const daysStale = t.latest_date
                   ? Math.floor((Date.now() - new Date(t.latest_date).getTime()) / (1000 * 60 * 60 * 24))

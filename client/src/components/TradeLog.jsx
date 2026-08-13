@@ -24,7 +24,7 @@ export default function TradeLog({ trades, applyCosts = true }) {
     return (
       <div className="panel trade-log">
         <div className="panel-title-row">
-          <span className="panel-title">Trade Log</span>
+          <span className="panel-title">Trade History</span>
         </div>
         <div className="tl-empty">No trades — the strategy never opened a position in this window.</div>
       </div>
@@ -56,7 +56,7 @@ export default function TradeLog({ trades, applyCosts = true }) {
   return (
     <div className="panel trade-log">
       <div className="panel-title-row">
-        <span className="panel-title">Trade Log</span>
+        <span className="panel-title">Trade History</span>
         <button className="tl-export" onClick={exportCSV} title="Export ledger as CSV">
           <Download size={13} /> CSV
         </button>
@@ -66,10 +66,8 @@ export default function TradeLog({ trades, applyCosts = true }) {
         <table className="tl-table">
           <thead>
             <tr>
-              <th>#</th><th>Side</th><th>Exit</th><th>Entry</th><th>Exit Date</th>
-              <th className="tl-num">Shares</th><th className="tl-num">Entry ₹</th>
-              <th className="tl-num">Exit ₹</th><th className="tl-num">P&amp;L</th>
-              <th className="tl-num">Return</th><th className="tl-num">Days</th>
+              <th>Date</th><th>Type</th><th className="tl-num">Price</th>
+              <th className="tl-num">Shares</th><th className="tl-num">P&amp;L</th>
             </tr>
           </thead>
           <tbody>
@@ -80,19 +78,13 @@ export default function TradeLog({ trades, applyCosts = true }) {
               const badge = REASON_BADGE[t.exitReason] || REASON_BADGE.signal;
               return (
                 <tr key={i}>
-                  <td className="tl-dim">{i + 1}</td>
-                  <td><span className="tl-side">{t.type || 'LONG'}</span></td>
-                  <td><span className={`tl-badge ${badge.cls}`}>{badge.label}</span></td>
-                  <td>{fmtDate(t.entryDate)}</td>
-                  <td>{fmtDate(t.exitDate)}</td>
-                  <td className="tl-num">{t.shares}</td>
+                  <td className="tl-dim">{fmtDate(t.entryDate)}</td>
+                  <td><span className={`tl-badge ${badge.cls}`}>{isWin ? 'BUY' : 'SELL'}</span></td>
                   <td className="tl-num">{fmtPrice(t.entryPrice)}</td>
-                  <td className="tl-num">{t.exitPrice ? fmtPrice(t.exitPrice) : '—'}</td>
+                  <td className="tl-num">{t.shares}</td>
                   <td className={`tl-num ${cls}`}>
                     {pnl >= 0 ? '+' : '-'}₹{Math.abs(pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </td>
-                  <td className={`tl-num ${cls}`}>{t.pnlPct >= 0 ? '+' : ''}{t.pnlPct.toFixed(2)}%</td>
-                  <td className="tl-num tl-dim">{t.holdingPeriod ?? '—'}</td>
                 </tr>
               );
             })}
