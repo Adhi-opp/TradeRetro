@@ -9334,6 +9334,60 @@ html, body, #root {
   font-size: 12px !important;
 }
 
+.infra-status-list strong.status-ok {
+  color: var(--ds-green) !important;
+}
+
+.infra-status-list strong.status-bad {
+  color: var(--ds-red) !important;
+}
+
+.infra-status-list strong.status-neutral {
+  color: var(--ds-text-3) !important;
+  font-weight: 620 !important;
+}
+
+.infra-card-good {
+  border-color: color-mix(in srgb, var(--ds-green) 40%, transparent) !important;
+}
+
+.infra-card-warn {
+  border-color: color-mix(in srgb, var(--ds-accent) 45%, transparent) !important;
+}
+
+.infra-card-error {
+  border-color: color-mix(in srgb, var(--ds-red) 45%, transparent) !important;
+}
+
+.infra-card-info {
+  border-color: color-mix(in srgb, var(--ds-blue) 40%, transparent) !important;
+}
+
+.infra-value-muted {
+  color: var(--ds-text-3) !important;
+  font-weight: 650 !important;
+}
+
+.infra-chart-note {
+  margin-top: 14px !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+  color: var(--ds-text-3) !important;
+}
+
+.pipeline-hero-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.infra-updated {
+  font-size: 12px !important;
+  color: var(--ds-text-3) !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+
 .infra-empty-state,
 .dq-empty-inventory {
   min-height: 148px !important;
