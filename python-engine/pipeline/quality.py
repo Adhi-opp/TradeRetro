@@ -23,6 +23,10 @@ logger = logging.getLogger("traderetro.quality")
 # soft warning, not a hard fail; for equities/indices it stays hard.
 NEGATIVE_PRICE_OK = {"CRUDE"}
 
+# Trailing window for the "recent" scope. Wide enough to cover an incremental
+# load that lands a few prior sessions plus a weekend.
+RECENT_WINDOW_DAYS = 7
+
 HARD_CHECKS = [
     ("close_positive",
      "SELECT COUNT(*) FROM raw.historical_prices WHERE ticker = $1 {f} AND close_price <= 0",
@@ -54,28 +58,61 @@ SOFT_CHECKS = [
 ]
 
 
-async def run_quality_checks(ticker: str, only_recent: bool = False) -> dict:
+async def run_quality_checks(
+    ticker: str,
+    only_recent: bool = False,
+    start_date=None,
+    end_date=None,
+) -> dict:
     """
     Run all OHLCV quality checks for a ticker.
 
+    Scope, in order of precedence:
+      1. `start_date`/`end_date` — validate exactly the rows a load wrote.
+         This is what the EOD flow passes.
+      2. `only_recent` — trailing RECENT_WINDOW_DAYS. A fallback for the UI.
+      3. neither — full history.
+
+    `only_recent` used to mean `trade_date >= CURRENT_DATE`, i.e. today only.
+    Because incremental loads land two or three *prior* days' candles, the
+    gate routinely selected zero rows and short-circuited to a pass — open
+    far more often than it looked.
+
     Returns:
-        {"hard_fail": bool, "hard_failures": [...], "soft_warnings": [...], "rows_checked": int}
+        {"hard_fail": bool, "hard_failures": [...], "soft_warnings": [...],
+         "rows_checked": int, "scope": str}
     """
     pool = get_pool()
-    f = "AND trade_date >= CURRENT_DATE" if only_recent else ""
+
+    if start_date is not None and end_date is not None:
+        f = "AND trade_date BETWEEN $2 AND $3"
+        args = (ticker, start_date, end_date)
+        scope = f"batch {start_date}..{end_date}"
+    elif only_recent:
+        f = f"AND trade_date >= CURRENT_DATE - INTERVAL '{RECENT_WINDOW_DAYS} days'"
+        args = (ticker,)
+        scope = f"last {RECENT_WINDOW_DAYS} days"
+    else:
+        f = ""
+        args = (ticker,)
+        scope = "full history"
 
     async with pool.acquire() as conn:
         rows_checked = await conn.fetchval(
-            f"SELECT COUNT(*) FROM raw.historical_prices WHERE ticker = $1 {f}", ticker
+            f"SELECT COUNT(*) FROM raw.historical_prices WHERE ticker = $1 {f}", *args
         )
 
         if rows_checked == 0:
-            return {"hard_fail": False, "hard_failures": [], "soft_warnings": [], "rows_checked": 0}
+            # Not a pass — there was simply nothing in scope to judge.
+            return {
+                "hard_fail": False, "hard_failures": [], "soft_warnings": [],
+                "rows_checked": 0, "scope": scope, "verdict": "no_rows_in_scope",
+            }
 
         hard_failures = []
         downgraded = []  # hard checks waived to soft for this ticker
         for name, sql, detail_tpl in HARD_CHECKS:
-            count = await conn.fetchval(sql.replace("{f}", f), ticker)
+            count = await conn.fetchval(sql.replace("{f}", f), *args)
             if count > 0:
                 item = {"check": name, "detail": detail_tpl.format(n=count), "row_count": count}
                 if name == "close_positive" and ticker in NEGATIVE_PRICE_OK:
@@ -86,23 +123,25 @@ async def run_quality_checks(ticker: str, only_recent: bool = False) -> dict:
 
         soft_warnings = list(downgraded)
         for name, sql, detail_tpl in SOFT_CHECKS:
-            count = await conn.fetchval(sql.replace("{f}", f), ticker)
+            count = await conn.fetchval(sql.replace("{f}", f), *args)
             if count > 0:
                 soft_warnings.append({"check": name, "detail": detail_tpl.format(n=count), "row_count": count})
 
     hard_fail = len(hard_failures) > 0
     if hard_fail:
-        logger.error("DQ HARD FAIL for %s: %s", ticker, hard_failures)
+        logger.error("DQ HARD FAIL for %s (%s): %s", ticker, scope, hard_failures)
     if soft_warnings:
-        logger.warning("DQ warnings for %s: %s", ticker, soft_warnings)
+        logger.warning("DQ warnings for %s (%s): %s", ticker, scope, soft_warnings)
     if not hard_fail and not soft_warnings:
-        logger.info("DQ passed for %s (%d rows)", ticker, rows_checked)
+        logger.info("DQ passed for %s (%d rows, %s)", ticker, rows_checked, scope)
 
     return {
         "hard_fail": hard_fail,
         "hard_failures": hard_failures,
         "soft_warnings": soft_warnings,
         "rows_checked": rows_checked,
+        "scope": scope,
+        "verdict": "fail" if hard_fail else ("warn" if soft_warnings else "pass"),
     }
 
 

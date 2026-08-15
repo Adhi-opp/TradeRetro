@@ -5,8 +5,10 @@ Read-only endpoints that surface results of the existing quality
 checks (pipeline/quality.py) in a single round-trip, so the UI can
 show DQ status without triggering a long-running Prefect flow.
 
-    GET /api/quality/audit          — per-ticker audit across the universe
+    GET /api/quality/audit          — per-ticker audit + medallion completeness
     GET /api/quality/audit/{ticker} — drill into one ticker
+    GET /api/quality/medallion      — silver vs gold bucket reconciliation
+    POST /api/quality/gold-refresh  — force a full-range gold materialization
 """
 
 import asyncio
@@ -15,6 +17,7 @@ from datetime import date as dt_date
 
 from fastapi import APIRouter, Query
 
+from pipeline.gold_refresh import gold_completeness, refresh_and_report
 from pipeline.quality import (
     run_quality_checks,
     run_gap_detection,
@@ -94,6 +97,28 @@ async def audit_all(recent: bool = Query(True, description="Restrict to recent r
     counts = {sev: sum(1 for r in results if r["severity"] == sev)
               for sev in ("critical", "error", "warning", "info", "ok")}
 
+    # Cross-layer reconciliation. Per-ticker checks only ever looked at
+    # raw.historical_prices, so the audit could report a fully healthy
+    # warehouse while the gold continuous aggregates were missing half their
+    # buckets. Roll gold completeness into the same verdict.
+    try:
+        medallion = await gold_completeness()
+    except Exception as exc:
+        logger.warning("Gold completeness check failed: %s", exc)
+        medallion = [{"layer": "gold", "status": "errored", "error": str(exc)}]
+
+    medallion_status = "ok"
+    if any(m.get("status") == "critical" for m in medallion):
+        medallion_status = "critical"
+    elif any(m.get("status") in ("warning", "errored") for m in medallion):
+        medallion_status = "warning"
+
+    pipeline_healthy = (
+        counts["critical"] == 0
+        and counts["error"] == 0
+        and medallion_status == "ok"
+    )
+
     return {
         "summary": {
             "total_tickers": len(results),
@@ -102,11 +127,32 @@ async def audit_all(recent: bool = Query(True, description="Restrict to recent r
             "info": counts["info"],
             "ok": counts["ok"],
             "errored": counts["error"],
+            # Single verdict the dashboard can trust — spans both the
+            # per-ticker EOD checks and the medallion rollups.
+            "medallion_status": medallion_status,
+            "pipeline_healthy": pipeline_healthy,
         },
+        "medallion": medallion,
         "results": results,
         "checked_at": dt_date.today().isoformat(),
         "scope": "recent" if recent else "full_history",
     }
+
+
+@router.get("/medallion")
+async def medallion_completeness():
+    """Silver vs gold bucket reconciliation, on its own for the pipeline view."""
+    return {"layers": await gold_completeness()}
+
+
+@router.post("/gold-refresh")
+async def force_gold_refresh():
+    """
+    Materialize both continuous aggregates over their full range and report
+    the resulting completeness. Safe to call repeatedly — refreshing an
+    already-current bucket is a no-op.
+    """
+    return await refresh_and_report()
 
 
 @router.get("/audit/{ticker}")

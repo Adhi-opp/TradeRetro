@@ -1,8 +1,19 @@
-// Client-side performance analytics derived from the backtest response.
-// All inputs are the existing equityCurve / trades arrays that the Python
-// engine already returns - no backend change required.
+// Presentation-layer analytics derived from the backtest response.
+//
+// SCOPE RULE: this module computes only things the engine does NOT return —
+// series for charts (drawdown, monthly grid, histogram, rolling Sharpe) and
+// trade-list roll-ups. Every scalar risk statistic (Sharpe, Sortino, Calmar,
+// annualized vol, VaR) comes from engine/metrics.py and is read straight off
+// `result.metrics`.
+//
+// It used to recompute Sortino and rolling Sharpe here with rf = 0 and a
+// sample stddev while the backend used rf = 6.5% and a population stddev —
+// three conventions on screen at once, none of them labelled.
 
 const TRADING_DAYS = 252;
+// Must match engine/metrics.py RISK_FREE_RATE.
+const RISK_FREE_RATE = 0.065;
+const DAILY_RISK_FREE = RISK_FREE_RATE / TRADING_DAYS;
 
 function dailyReturns(curve) {
   const out = [];
@@ -83,7 +94,10 @@ function rollingSharpe(returns, window = 60) {
     const slice = returns.slice(i - window + 1, i + 1).map((r) => r.ret);
     const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
     const sd = stdev(slice);
-    const ann = sd > 0 ? (mean / sd) * Math.sqrt(TRADING_DAYS) : 0;
+    // Same convention as engine/metrics.py rolling_sharpe: excess over the
+    // daily risk-free rate, annualized. Omitting rf here made the chart
+    // disagree with the Sharpe shown in the KPI ribbon.
+    const ann = sd > 0 ? ((mean - DAILY_RISK_FREE) / sd) * Math.sqrt(TRADING_DAYS) : 0;
     out.push({ date: returns[i].date, sharpe: ann });
   }
   return out;
@@ -159,36 +173,37 @@ function tradeAnalytics(trades, applyCosts = true) {
 
 export function analyze(result, applyCosts = true) {
   if (!result || !result.equityCurve || !result.equityCurve.length) return null;
+
+  // The engine returns a full metric block for each cost view. Reading the
+  // matching one keeps every scalar on screen consistent with the toggle —
+  // and stops a gross return being shown beside a net Sharpe.
+  const engine = applyCosts
+    ? (result.metrics || {})
+    : { ...(result.metrics || {}), ...(result.grossMetrics || {}) };
+
   const curve = result.equityCurve;
-  const rets = dailyReturns(curve);
-  const dd = drawdownSeries(curve);
+  const equityKey = applyCosts ? 'equity' : 'grossEquity';
+  const viewCurve = curve.map((p) => ({ ...p, equity: p[equityKey] ?? p.equity }));
 
-  const daily = rets.map((r) => r.ret);
-  const negDaily = daily.filter((r) => r < 0);
-  const meanDaily = daily.length ? daily.reduce((a, b) => a + b, 0) / daily.length : 0;
-  const sdDaily = stdev(daily);
-  const downDev = stdev(negDaily);
-
-  const annReturn = meanDaily * TRADING_DAYS;
-  const annVol = sdDaily * Math.sqrt(TRADING_DAYS);
-  const sortino = downDev > 0 ? (meanDaily * TRADING_DAYS) / (downDev * Math.sqrt(TRADING_DAYS)) : 0;
-
-  const maxDDpct = Math.min(...dd.map((p) => p.drawdown));
-  const calmar = maxDDpct < 0 ? (result.metrics.cagr ?? annReturn * 100) / Math.abs(maxDDpct) : 0;
-  const ddDuration = maxDrawdownDuration(dd);
+  const rets = dailyReturns(viewCurve);
+  const dd = drawdownSeries(viewCurve);
 
   return {
+    // ── series the engine doesn't return (charts only) ──
     dailyReturns: rets,
     drawdown: dd,
-    monthly: monthlyReturns(curve),
+    monthly: monthlyReturns(viewCurve),
     rollingSharpe: rollingSharpe(rets, 60),
     histogram: returnHistogram(rets),
     trades: tradeAnalytics(result.trades, applyCosts),
-    annReturn: annReturn * 100,
-    annVol: annVol * 100,
-    sortino,
-    calmar,
-    maxDDDurationDays: ddDuration,
-    var95Daily: Math.abs(returnHistogram(rets).var95),
+    maxDDDurationDays: maxDrawdownDuration(dd),
+
+    // ── scalars: passed through from engine/metrics.py, never recomputed ──
+    annReturn: engine.annualizedReturn,
+    annVol: engine.annualizedVolatility,
+    sortino: engine.sortinoRatio,
+    calmar: engine.calmarRatio,
+    downsideDeviation: engine.downsideDeviation,
+    var95Daily: engine.var95Daily,
   };
 }

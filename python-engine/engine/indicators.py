@@ -16,9 +16,20 @@ def compute_rsi(close_prices: np.ndarray, period: int = 14) -> np.ndarray:
     RSI using Wilder's smoothing (EMA with alpha=1/period).
 
     Matches the npm 'technicalindicators' RSI output.
-    Returns array of length (len(close_prices) - period).
-    The first `period` values have no RSI (insufficient data).
+
+    Index contract — element `j` is the RSI *of bar* `j + period`, so the
+    caller indexes it as `rsi[bar_index - period]`. Length is therefore
+    exactly `len(close_prices) - period`.
+
+    The seeded average (simple mean of the first `period` deltas) IS the
+    first RSI value and must be emitted before any smoothing. Dropping it
+    shortens the array by one and shifts every element one bar into the
+    future — i.e. look-ahead bias, since bar i would then read an RSI
+    computed through bar i+1's close.
     """
+    if len(close_prices) <= period:
+        return np.array([])
+
     deltas = np.diff(close_prices)
     gains = np.where(deltas > 0, deltas, 0.0)
     losses = np.where(deltas < 0, -deltas, 0.0)
@@ -27,20 +38,21 @@ def compute_rsi(close_prices: np.ndarray, period: int = 14) -> np.ndarray:
     alpha = 1.0 / period
 
     # First average: simple mean of first `period` values
-    avg_gain = np.mean(gains[:period])
-    avg_loss = np.mean(losses[:period])
+    avg_gain = float(np.mean(gains[:period]))
+    avg_loss = float(np.mean(losses[:period]))
 
-    rsi_values = []
+    def _rsi(gain: float, loss: float) -> float:
+        if loss == 0:
+            return 100.0
+        return 100.0 - (100.0 / (1.0 + gain / loss))
+
+    # Seed value — the RSI of bar `period`.
+    rsi_values = [_rsi(avg_gain, avg_loss)]
 
     for i in range(period, len(deltas)):
         avg_gain = avg_gain * (1 - alpha) + gains[i] * alpha
         avg_loss = avg_loss * (1 - alpha) + losses[i] * alpha
-
-        if avg_loss == 0:
-            rsi_values.append(100.0)
-        else:
-            rs = avg_gain / avg_loss
-            rsi_values.append(100.0 - (100.0 / (1.0 + rs)))
+        rsi_values.append(_rsi(avg_gain, avg_loss))  # RSI of bar i + 1
 
     return np.array(rsi_values)
 

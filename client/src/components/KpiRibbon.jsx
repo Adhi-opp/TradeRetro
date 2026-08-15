@@ -1,15 +1,23 @@
-import { TrendingUp, TrendingDown, Trophy, ShieldAlert, Activity, Percent } from 'lucide-react';
+import {
+  TrendingUp, TrendingDown, Trophy, ShieldAlert, Activity,
+  Percent, LineChart, Scale, Gauge, Clock,
+} from 'lucide-react';
 
+// `icon` and `badge` are optional. A KPI states a measured number; it does not
+// grade it. The graded variants ("EXCELLENT", "LOW RISK") were dropped because
+// their thresholds compared a negative drawdown against a positive bound, so
+// every run — including a -46% drawdown — rendered as low risk.
 function Kpi({ icon: Icon, label, value, tone, sub, trend, badge }) {
   const isPos = tone === 'pos';
-  const isNeg = tone === 'neg';
   return (
     <div className="kpi">
       <div className="kpi-top">
-        <span className="kpi-icon-wrapper">
-          <Icon size={16} />
-        </span>
-        <span className="kpi-badge">{badge || 'ACTIVE'}</span>
+        {Icon && (
+          <span className="kpi-icon-wrapper">
+            <Icon size={16} />
+          </span>
+        )}
+        {badge && <span className="kpi-badge">{badge}</span>}
       </div>
       <div className="kpi-body">
         <div className="kpi-label">{label}</div>
@@ -32,51 +40,45 @@ const pct = (v, dp = 1) => (v == null ? '—' : `${v.toFixed(dp)}%`);
 const signedPct = (v, dp = 2) => (v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(dp)}%`);
 const toneOf = (v) => (v == null ? '' : v >= 0 ? 'pos' : 'neg');
 
-export default function KpiRibbon({ metrics, analytics }) {
+// A Sharpe of 0.002 rounds to "0.00" at two decimals and reads as missing
+// data rather than as a near-zero result. Widen the precision only when the
+// value would otherwise vanish.
+export const ratio = (v) => {
+  if (v == null || Number.isNaN(v)) return '—';
+  if (v !== 0 && Math.abs(v) < 0.005) return v.toFixed(3);
+  return v.toFixed(2);
+};
+
+export default function KpiRibbon({ metrics, applyCosts }) {
   if (!metrics) return null;
 
-  const alpha = (metrics.totalReturn ?? 0) - (metrics.buyHoldReturn ?? 0);
-  const totalTrades = metrics.totalTrades ?? 0;
-  const winRate = metrics.winRate ?? 0;
+  // Excess CAGR, not alpha — a plain return spread with no beta adjustment.
+  // Comes from the engine so gross and net views stay internally consistent.
+  // (The beta-adjusted figure is Jensen's alpha, reported in RiskMetricsGrid.)
+  const excess = metrics.excessCagr;
 
   return (
     <div className="kpi-ribbon">
-      <Kpi 
-        icon={Trophy} 
-        label="Net Profit" 
-        value={signedPct(metrics.totalReturn)} 
-        tone={toneOf(metrics.totalReturn)} 
-        sub={`${signedPct(alpha)} alpha`} 
-        trend={metrics.totalReturn >= 0 ? "Up" : "Down"} 
-        badge={metrics.totalReturn >= 20 ? "EXCELLENT" : "STABLE"} 
+      <Kpi
+        icon={Trophy}
+        label="Total Return"
+        value={signedPct(metrics.totalReturn)}
+        tone={toneOf(metrics.totalReturn)}
+        sub={applyCosts ? 'net of costs' : 'costs excluded'}
       />
-      <Kpi 
-        icon={ShieldAlert} 
-        label="Max Drawdown" 
-        value={pct(metrics.maxDrawdown)} 
-        tone="neg" 
-        sub="Peak to trough" 
-        trend="Risk" 
-        badge={metrics.maxDrawdown <= 15 ? "LOW RISK" : "CRITICAL"} 
+      <Kpi icon={LineChart} label="CAGR" value={signedPct(metrics.cagr)} tone={toneOf(metrics.cagr)} />
+      <Kpi
+        icon={Scale}
+        label="Excess CAGR"
+        value={signedPct(excess)}
+        tone={toneOf(excess)}
+        sub={`vs B&H ${signedPct(metrics.benchmarkCagr)}`}
       />
-      <Kpi 
-        icon={Activity} 
-        label="Sharpe Ratio" 
-        value={metrics.sharpeRatio?.toFixed(2) ?? '-'} 
-        tone={toneOf(metrics.sharpeRatio)} 
-        sub="Risk-adjusted return" 
-        trend={metrics.sharpeRatio >= 1.5 ? "Efficient" : "Moderate"} 
-        badge={metrics.sharpeRatio >= 2 ? "HIGH ALPHA" : "NORMAL"} 
-      />
-      <Kpi 
-        icon={Percent} 
-        label="Win Ratio" 
-        value={pct(winRate, 1)} 
-        tone={winRate >= 50 ? 'pos' : 'neg'} 
-        sub={`${totalTrades} trades executed`} 
-        trend={winRate >= 50 ? "Outperforming" : "Underperforming"} 
-        badge={winRate >= 60 ? "PRECISE" : "VOLATILE"} 
-      />
+      <Kpi icon={ShieldAlert} label="Max Drawdown" value={pct(metrics.maxDrawdown)} tone="neg" sub="peak to trough" />
+      <Kpi icon={Activity} label="Sharpe" value={ratio(metrics.sharpeRatio)} tone={toneOf(metrics.sharpeRatio)} sub="rf 6.5%" />
+      <Kpi icon={Gauge} label="Sortino" value={ratio(metrics.sortinoRatio)} tone={toneOf(metrics.sortinoRatio)} sub="rf 6.5%" />
+      <Kpi icon={Percent} label="Win Rate" value={pct(metrics.winRate, 0)} tone={metrics.winRate >= 50 ? 'pos' : 'neg'} sub={`${metrics.totalTrades} trades`} />
+      <Kpi icon={Clock} label="Exposure" value={pct(metrics.exposurePct, 0)} sub="time in market" />
     </div>
   );
 }

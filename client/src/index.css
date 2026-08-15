@@ -71,8 +71,12 @@
   --lh-body: 1.5;
   --lh-caption: 1.4;
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* Typography */
+  /* Loaded in main.jsx via @fontsource — see the note there. These faces are
+     bundled, so index.html carries no font <link>; naming a face that is not
+     imported there would fall back silently. */
+  --font-sans: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Spacing Variables */
   --page-padding: 40px;
@@ -107,6 +111,23 @@
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.15);
   --shadow-md: 0 4px 20px rgba(0,0,0,0.25);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.35);
+
+  /* ── Aliases ────────────────────────────────────────────────
+     Several components were written against token names this
+     stylesheet never defined (--surface, --surface-alt, --accent,
+     --bg-card, --pill, --text-tertiary, --negative). Each var() call
+     silently fell through to a hardcoded dark literal — or, where no
+     fallback was given, dropped the declaration entirely. The result:
+     the Data Quality medallion cards and quality-gate rows rendered
+     dark-on-dark in LIGHT theme, with the numbers invisible.
+     Defining them here makes those components theme-aware. */
+  --surface:        var(--bg-panel);
+  --surface-alt:    var(--bg-input);
+  --bg-card:        var(--bg-panel);
+  --pill:           var(--bg-elevated);
+  --accent:         var(--primary);
+  --text-tertiary:  var(--text-muted);
+  --negative:       var(--red);
 }
 
 /* ── Light Theme ─────────────────────────────────────────── */
@@ -215,195 +236,215 @@ body {
    LANDING PAGE
    ══════════════════════════════════════════════════════════════ */
 
-.landing {
+/* ── Landing ──────────────────────────────────────────────────────
+   Dark-first by design: this is a terminal, and the shell it launches
+   into is a terminal. The ground is the app's own near-black; depth
+   comes from a hairline grid and a single off-centre mint bloom rather
+   than from cards stacked on cards. One orchestrated entrance — every
+   element rises on the same curve, staggered by animationDelay set
+   inline in Landing.jsx. */
+
+.lnd {
   position: relative;
+  min-height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  width: 100%;
+  overflow: hidden;
   background: var(--bg-root);
-  animation: fadeIn .6s var(--ease);
+  padding: 48px 24px;
 }
 
-.landing::before {
-  content: "";
+/* Hairline measurement grid — a plotting surface, not decoration. */
+.lnd-grid {
   position: absolute;
   inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px);
+  background-size: 76px 76px;
+  mask-image: radial-gradient(ellipse 92% 68% at 50% 42%, #000 20%, transparent 78%);
   pointer-events: none;
+}
+
+/* Single accent bloom, held off-centre so the composition isn't symmetric. */
+.lnd-glow {
+  position: absolute;
+  top: -22%;
+  left: 58%;
+  width: min(920px, 105vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
   background: radial-gradient(
-    52% 36% at 50% 36%,
-    color-mix(in srgb, var(--amber) 14%, transparent),
-    transparent 70%
+    circle,
+    color-mix(in srgb, var(--primary) 15%, transparent) 0%,
+    transparent 62%
   );
-  opacity: .45;
+  filter: blur(46px);
+  pointer-events: none;
 }
 
-.landing-content {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  max-width: 620px;
-  padding: 48px 24px 40px;
-}
-
-.landing-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  animation: fadeInUp .5s var(--ease) both;
-}
-
-.landing-logo {
-  display: flex;
-  animation: fadeInUp .5s var(--ease) both;
-}
-
-.landing-title {
-  font-size: 3rem !important;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--text-primary);
-  line-height: 1.05;
-  margin-top: 6px;
-}
-
-.landing-tagline {
-  font-family: var(--font-mono);
-  font-size: .76rem;
-  font-weight: 600;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: var(--amber);
-}
-
-.landing-desc {
-  font-size: .95rem;
-  color: var(--text-secondary);
-  line-height: 1.7;
-  max-width: 480px;
-  margin: 26px 0 34px;
-}
-
-.landing-features {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+/* Ambient equity curve along the bottom edge. Masked in from both sides so it
+   reads as a horizon rather than a chart, and kept behind the content. */
+.lnd-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  max-width: 560px;
-  margin-bottom: 34px;
+  height: min(46vh, 380px);
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
 }
 
-.landing-feature {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  text-align: left;
-  transition: border-color .2s var(--ease), transform .2s var(--ease);
+.lnd-horizon path { vector-effect: non-scaling-stroke; }
+
+.lnd-horizon-strat {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  stroke-opacity: .40;
+  stroke-linejoin: round;
 }
 
-.landing-feature:hover {
-  border-color: var(--amber);
-  transform: translateY(-1px);
+.lnd-horizon-bench {
+  fill: none;
+  stroke: var(--text-secondary);
+  stroke-width: 1.25;
+  stroke-opacity: .22;
+  stroke-dasharray: 5 6;
+  stroke-linejoin: round;
 }
 
-.landing-feature-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--amber-bg);
-  color: var(--amber);
-}
-
-.landing-feature-body {
+.lnd-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 940px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
 }
 
-.landing-feature-title {
-  font-size: .84rem;
-  font-weight: 600;
-  letter-spacing: .01em;
+.lnd-content > * {
+  opacity: 0;
+  animation: lndRise .62s cubic-bezier(.22, .8, .3, 1) forwards;
+}
+
+@keyframes lndRise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ── headline ── */
+.lnd-title {
+  font-family: var(--font-sans);
+  font-size: clamp(3.2rem, 9vw, 6.4rem);
+  font-weight: 700;
+  letter-spacing: -.05em;
+  line-height: .92;
   color: var(--text-primary);
+  margin: 0 0 22px;
 }
 
-.landing-feature-desc {
-  font-size: .74rem;
+.lnd-thesis {
+  font-family: var(--font-sans);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 500;
+  line-height: 1.28;
+  letter-spacing: -.022em;
+  color: var(--primary);
+  margin: 0 0 22px;
+  max-width: 34ch;
+  text-wrap: balance;
+}
+
+.lnd-desc {
+  font-size: .95rem;
+  line-height: 1.75;
   color: var(--text-secondary);
-  line-height: 1.55;
+  max-width: 58ch;
+  margin: 0 0 52px;
 }
 
-.landing-btn {
+
+/* ── call to action ── */
+.lnd-cta {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 38px;
-  border: 1px solid var(--amber);
+  gap: 11px;
+  padding: 14px 26px;
+  border: 1px solid var(--primary);
   border-radius: var(--radius-sm);
-  background: var(--amber-bg);
-  color: var(--amber);
+  background: var(--primary-bg);
+  color: var(--primary);
   font-family: var(--font-mono);
-  font-size: .95rem;
+  font-size: .88rem;
   font-weight: 600;
-  letter-spacing: .03em;
+  letter-spacing: .06em;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 0 22px -10px color-mix(in srgb, var(--amber) 55%, transparent);
-  transition: background .2s var(--ease), color .2s var(--ease),
-              box-shadow .2s var(--ease), transform .2s var(--ease);
+  transition: background .22s var(--ease), color .22s var(--ease),
+              transform .22s var(--ease), box-shadow .22s var(--ease);
 }
 
-.landing-btn:hover {
-  background: var(--amber);
-  border-color: var(--amber);
+.lnd-cta svg { transition: transform .22s var(--ease); }
+
+.lnd-cta:hover {
+  background: var(--primary);
   color: var(--bg-root);
-  box-shadow: 0 0 30px -8px color-mix(in srgb, var(--amber) 70%, transparent);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
-.landing-btn:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
+.lnd-cta:hover svg { transform: translateX(3px); }
+
+.lnd-cta:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
-.landing-stack {
+/* ── footer chips ── */
+.lnd-foot {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 36px;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 44px;
 }
 
-.landing-stack span {
-  padding: 5px 11px;
-  font-size: .62rem;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--text-secondary);
-  background: var(--surface-alt);
+.lnd-foot span {
+  padding: 4px 9px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.landing-version {
-  font-size: .68rem;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  letter-spacing: .1em;
+.lnd-foot-ver {
+  border-color: color-mix(in srgb, var(--primary) 34%, transparent) !important;
+  color: var(--primary) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lnd-content > * {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .lnd { padding: 32px 18px; }
+  .lnd-thesis { max-width: none; }
+  .lnd-foot { margin-top: 32px; }
 }
 
 /* ── Brand mark ─────────────────────────────────────── */

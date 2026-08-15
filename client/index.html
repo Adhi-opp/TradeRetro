@@ -7,9 +7,13 @@
     <meta name="description" content="Algorithmic backtest engine for retail traders — validate your strategy against historical data." />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <title>TradeRetro — Algorithmic Backtest Engine</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!--
+      Fonts are self-hosted via @fontsource and imported in src/main.jsx, so
+      they are bundled and work offline. The Google Fonts <link> that used to
+      sit here pulled Inter and JetBrains Mono over the network on every load
+      — a render-blocking third-party request for faces the stylesheet no
+      longer references.
+    -->
   </head>
   <body>
     <div id="root"></div>

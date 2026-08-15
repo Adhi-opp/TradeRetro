@@ -9,6 +9,8 @@ produce mathematically correct values.
 import numpy as np
 import pytest
 
+import engine.metrics as md
+
 from engine.metrics import (
     alpha,
     benchmark_cagr,
@@ -158,3 +160,109 @@ class TestInformationRatio:
         equity = np.array([100_000.0])
         prices = np.array([1000.0])
         assert information_ratio(equity, prices) == 0.0
+
+
+# ── Sortino / downside deviation (STAT-01) ───────────────────────────────────
+
+class TestSortinoAndDownsideDeviation:
+    """
+    Regression guard for STAT-01. The client used to compute Sortino as
+    stdev(negative returns about their own mean) with Rf = 0, which both
+    divides by the wrong N and drops the target — it can rank a losing
+    strategy above its own Sharpe.
+    """
+
+    @staticmethod
+    def _curve_from_returns(rets, start=100_000.0):
+        eq = [start]
+        for r in rets:
+            eq.append(eq[-1] * (1 + r))
+        return np.array(eq, dtype=np.float64)
+
+    def test_downside_deviation_divides_by_all_periods(self):
+        # 4 periods, only one below target -> mean of squares over N=4, not 1.
+        rets = [0.02, 0.02, -0.03, 0.02]
+        eq = self._curve_from_returns(rets)
+
+        actual = md.downside_deviation(eq, target=0.0)
+        realised = md.daily_returns(eq)
+        shortfall = np.minimum(realised - 0.0, 0.0)
+        expected = float(np.sqrt(np.mean(shortfall ** 2)) * np.sqrt(md.TRADING_DAYS))
+
+        assert actual == pytest.approx(expected, rel=1e-12)
+        # Dividing by the count of losers only would be ~2x larger.
+        wrong = float(np.sqrt(np.sum(shortfall ** 2) / 1) * np.sqrt(md.TRADING_DAYS))
+        assert actual < wrong
+
+    def test_no_losing_period_gives_zero_downside_deviation(self):
+        eq = self._curve_from_returns([0.01] * 20)
+        assert md.downside_deviation(eq, target=0.0) == 0.0
+
+    def test_sortino_uses_the_same_risk_free_rate_as_sharpe(self):
+        """
+        Both ratios share a numerator: annualized excess return. Their ratio
+        must therefore equal the inverse ratio of their denominators.
+        """
+        rng = np.random.default_rng(3)
+        eq = self._curve_from_returns(rng.normal(0.0004, 0.01, 400))
+
+        sharpe = md.sharpe_ratio(eq)
+        sortino = md.sortino_ratio(eq)
+        ann_vol = md.annualized_volatility(eq) / 100
+        dd = md.downside_deviation(eq)
+
+        assert sharpe == pytest.approx(sortino * dd / ann_vol, rel=1e-9)
+
+    def test_sortino_exceeds_sharpe_when_downside_is_thin(self):
+        """Upside-skewed series: downside deviation < total vol -> Sortino > Sharpe."""
+        rets = [0.05, 0.05, 0.05, -0.005, 0.05, -0.005] * 20
+        eq = self._curve_from_returns(rets)
+        assert md.sortino_ratio(eq) > md.sharpe_ratio(eq) > 0
+
+    def test_short_curve_is_zero_not_nan(self):
+        for fn in (md.sortino_ratio, md.downside_deviation,
+                   md.annualized_volatility, md.value_at_risk):
+            assert fn(np.array([100_000.0])) == 0.0
+
+
+class TestRollingSharpe:
+    def test_window_shorter_than_data_is_empty(self):
+        assert md.rolling_sharpe(np.linspace(100_000, 110_000, 30), window=60) == []
+
+    def test_last_value_matches_full_sharpe_of_that_window(self):
+        rng = np.random.default_rng(11)
+        eq = np.cumprod(np.concatenate([[100_000.0], 1 + rng.normal(0.0005, 0.01, 200)]))
+        window = 60
+        roll = md.rolling_sharpe(eq, window=window)
+        assert len(roll) == len(md.daily_returns(eq)) - window + 1
+        # Recomputing the standalone Sharpe over the final window's equity
+        # segment must agree with the last rolling value.
+        assert md.sharpe_ratio(eq[-(window + 1):]) == pytest.approx(roll[-1], rel=1e-9)
+
+
+class TestJensensAlpha:
+    def test_beta_one_and_zero_alpha_when_strategy_equals_benchmark(self):
+        rng = np.random.default_rng(5)
+        prices = np.cumprod(np.concatenate([[1000.0], 1 + rng.normal(0.0004, 0.012, 300)]))
+        out = md.jensens_alpha(prices, prices)
+        assert out["beta"] == pytest.approx(1.0, abs=1e-9)
+        assert out["alpha"] == pytest.approx(0.0, abs=1e-9)
+        assert out["rSquared"] == pytest.approx(1.0, abs=1e-9)
+
+    def test_half_exposure_gives_beta_near_half(self):
+        rng = np.random.default_rng(9)
+        bench_rets = rng.normal(0.0005, 0.012, 400)
+        prices = np.cumprod(np.concatenate([[1000.0], 1 + bench_rets]))
+        equity = np.cumprod(np.concatenate([[100_000.0], 1 + 0.5 * bench_rets]))
+        out = md.jensens_alpha(equity, prices)
+        assert out["beta"] == pytest.approx(0.5, abs=0.02)
+
+    def test_degenerate_input_returns_zeros(self):
+        out = md.jensens_alpha(np.array([1.0, 2.0]), np.array([1.0]))
+        assert out == {"alpha": 0.0, "beta": 0.0, "rSquared": 0.0}
+
+
+class TestExcessCagrNaming:
+    def test_alpha_is_a_deprecated_mirror_of_excess_cagr(self):
+        assert md.alpha is md.excess_cagr
+        assert md.excess_cagr(25.0, 15.0) == 10.0

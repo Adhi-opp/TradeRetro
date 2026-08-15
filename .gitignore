@@ -28,5 +28,16 @@ pgdata/
 # Claude Code local settings
 .claude/settings.local.json
 
+# coverage
+.coverage
+htmlcov/
+
 # Temporary OpenCode workspace
 .opencode/
+
+# Local AI assistant instructions and team deck templates — working files,
+# not source. Kept out of the repo so the published history stays the
+# engineering record.
+Claude.md
+CLAUDE.md
+*.pptx

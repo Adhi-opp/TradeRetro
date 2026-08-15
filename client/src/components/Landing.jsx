@@ -1,64 +1,111 @@
-import { createElement } from 'react';
-import { Terminal, Sun, Moon, Database, Activity, FlaskConical, RotateCcw } from 'lucide-react';
-import TradeRetroLogo from './ui/TradeRetroLogo';
+import { Sun, Moon, ArrowRight } from 'lucide-react';
 import PRODUCT from '../constants/product';
 
-const CAPABILITIES = [
-  { Icon: FlaskConical, title: 'Strategy Validation', desc: 'Test systematic trading ideas against historical market behaviour.' },
-  { Icon: Database, title: 'Historical Data', desc: 'Explore structured market data through the Timescale warehouse.' },
-  { Icon: RotateCcw, title: 'Backtesting', desc: 'Evaluate strategies with deterministic execution and Indian transaction costs.' },
-  { Icon: Activity, title: 'Data Operations', desc: 'Monitor ingestion, freshness and pipeline health.' },
-];
+/**
+ * Ambient horizon: a strategy curve against its benchmark, drawn once at
+ * module load and held still. It is the shape the product actually produces,
+ * so it carries the subject rather than decorating it, and it gives the lower
+ * half of the page something to sit on now that the stat cards are gone.
+ */
+function buildWalk(seed, n, drift, start) {
+  let s = seed;
+  const rnd = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const pts = [];
+  let v = start;
+  for (let i = 0; i < n; i += 1) {
+    v += (rnd() - drift) * 0.055;
+    v = Math.max(0.06, Math.min(0.94, v));
+    pts.push([(i / (n - 1)) * 1440, 320 - v * 320]);
+  }
+  return pts;
+}
 
-const STACK = ['FastAPI', 'React', 'TimescaleDB', 'Redis', 'Prefect', 'Python'];
+/** Quadratic midpoint smoothing, so the walk reads as a price series. */
+function toPath(pts) {
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length - 1; i += 1) {
+    const [x0, y0] = pts[i];
+    const [x1, y1] = pts[i + 1];
+    d += ` Q${x0.toFixed(1)} ${y0.toFixed(1)} ${((x0 + x1) / 2).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)}`;
+  }
+  const last = pts[pts.length - 1];
+  d += ` L${last[0].toFixed(1)} ${last[1].toFixed(1)}`;
+  return d;
+}
+
+const STRATEGY = toPath(buildWalk(20180101, 96, 0.455, 0.34));
+const BENCHMARK = toPath(buildWalk(77447731, 96, 0.44, 0.30));
+
+function Horizon() {
+  return (
+    <svg
+      className="lnd-horizon"
+      viewBox="0 0 1440 320"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id="lnd-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.16" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${BENCHMARK} L1440 320 L0 320 Z`} fill="none" />
+      <path className="lnd-horizon-bench" d={BENCHMARK} />
+      <path d={`${STRATEGY} L1440 320 L0 320 Z`} fill="url(#lnd-fill)" stroke="none" />
+      <path className="lnd-horizon-strat" d={STRATEGY} />
+    </svg>
+  );
+}
 
 export default function Landing({ onEnter, theme, onToggleTheme }) {
   return (
-    <div className="landing">
-      <button className="theme-toggle landing-theme-toggle" onClick={onToggleTheme} title="Toggle theme" aria-label="Toggle dark/light theme">
+    <div className="lnd">
+      <div className="lnd-grid" aria-hidden="true" />
+      <div className="lnd-glow" aria-hidden="true" />
+      <Horizon />
+
+      <button
+        className="theme-toggle landing-theme-toggle"
+        onClick={onToggleTheme}
+        title="Toggle theme"
+      >
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
       </button>
-      <div className="landing-content">
-        <div className="landing-brand">
-          <div className="landing-logo">
-            <TradeRetroLogo size={56} />
-          </div>
-          <h1 className="landing-title">TradeRetro</h1>
-          <p className="landing-tagline">Look Back. Test Better.</p>
-        </div>
 
-        <p className="landing-desc">
-          TradeRetro turns historical market data into a controlled environment for
-          strategy validation, backtesting and quantitative analysis.
+      <main className="lnd-content">
+        <h1 className="lnd-title" style={{ animationDelay: '60ms' }}>
+          TradeRetro
+        </h1>
+
+        <p className="lnd-thesis" style={{ animationDelay: '150ms' }}>
+          See what your strategy actually kept.
         </p>
 
-        <div className="landing-features">
-          {CAPABILITIES.map(({ Icon, title, desc }) => (
-            <div className="landing-feature" key={title}>
-              <div className="landing-feature-icon">
-                {createElement(Icon, { size: 17, strokeWidth: 1.9 })}
-              </div>
-              <div className="landing-feature-body">
-                <div className="landing-feature-title">{title}</div>
-                <div className="landing-feature-desc">{desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <p className="lnd-desc" style={{ animationDelay: '240ms' }}>
+          Ten years of NSE prices behind a streaming warehouse, and a backtest engine
+          that pays STT, brokerage, GST, stamp duty and slippage on every fill.
+          No frictionless maths, no trading on tomorrow&rsquo;s close.
+        </p>
 
-        <button className="landing-btn" onClick={onEnter}>
-          <Terminal size={17} strokeWidth={2} />
-          Launch Terminal
+        <button className="lnd-cta" onClick={onEnter} style={{ animationDelay: '340ms' }}>
+          <span>Launch Terminal</span>
+          <ArrowRight size={17} />
         </button>
 
-        <div className="landing-stack">
-          {STACK.map((item) => (
-            <span key={item}>{item}</span>
-          ))}
+        <div className="lnd-foot" style={{ animationDelay: '430ms' }}>
+          <span>TimescaleDB</span>
+          <span>Redis Streams</span>
+          <span>Prefect</span>
+          <span>FastAPI</span>
+          <span>React</span>
+          <span className="lnd-foot-ver">{PRODUCT.version}</span>
         </div>
-
-        <div className="landing-version">{PRODUCT.version} - {PRODUCT.releaseTitle}</div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -45,10 +45,15 @@ function buildParams(s) {
 const useBacktestStore = create((set, get) => ({
   // ── Global params (ControlBar) ────────────────────────────
   ticker: 'RELIANCE.NS',
-  startDate: '2024-09-01',
+  // Open on a window long enough to be worth looking at. A 2-year default
+  // produced ~5 trades, which is too thin to say anything about a strategy.
+  startDate: '2018-01-01',
   endDate: new Date().toISOString().split('T')[0],
   capital: 100000,
-  applyCosts: false,
+  // Net of costs is the honest default. Transaction costs are the whole
+  // point of this project — opening on the gross curve shows a number the
+  // user could never have earned.
+  applyCosts: true,
 
   // ── Strategy + params (StrategyConfig) ────────────────────
   strategyType: 'MOVING_AVERAGE_CROSSOVER',

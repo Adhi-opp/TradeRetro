@@ -71,13 +71,15 @@ export default function EquityChart({ data, showCosts = true }) {
     const finalBuyHold = points[points.length - 1].buyHold;
     const stratPct = ((finalEquity - initialEquity) / initialEquity) * 100;
     const bhPct = ((finalBuyHold - initialEquity) / initialEquity) * 100;
-    const alpha = stratPct - bhPct;
+    // Return spread over the same window — not alpha (no beta adjustment,
+    // and the strategy is only partly exposed). Labelled accordingly.
+    const spread = stratPct - bhPct;
 
     return {
       chartData: points,
       summary: {
         initialEquity, finalEquity, finalBuyHold,
-        stratPct, bhPct, alpha, beatsBH: alpha >= 0,
+        stratPct, bhPct, spread, beatsBH: spread >= 0,
       },
     };
   }, [data, equityKey]);
@@ -102,8 +104,8 @@ export default function EquityChart({ data, showCosts = true }) {
             </span>
           </span>
           <span className={`equity-summary-chip equity-alpha ${summary.beatsBH ? 'pos' : 'neg'}`}>
-            <span className="equity-summary-label">Alpha</span>
-            <span className="equity-summary-value">{formatPct(summary.alpha)}</span>
+            <span className="equity-summary-label">Spread</span>
+            <span className="equity-summary-value">{formatPct(summary.spread)}</span>
           </span>
         </div>
       </div>

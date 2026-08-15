@@ -183,12 +183,21 @@ def run_wfa(
         seg, running_capital = _stitch(running_capital, test_res.get("equityCurve", []))
         stitched.extend(seg)
 
-        is_metrics.append(best_is)
-        if oos_mv is not None and oos_mv == oos_mv:
-            oos_metrics.append(oos_mv)
+        oos_trades = int(tm.get("totalTrades", 0))
+
+        # Only folds that actually traded out-of-sample carry information about
+        # generalization. A fold with zero OOS trades is flat cash, and flat
+        # cash scored against a 6.5% risk-free rate yields a negative Sharpe —
+        # including those would measure "how often the strategy sat out", not
+        # "did the in-sample edge survive".
+        if oos_trades > 0:
+            is_metrics.append(best_is)
+            if oos_mv is not None and oos_mv == oos_mv:
+                oos_metrics.append(oos_mv)
 
         fold_records.append({
             "fold": k,
+            "active": oos_trades > 0,
             "trainStart": market_data[tr_vs]["date"] if tr_vs < len(market_data) else None,
             "trainEnd": market_data[tr_ve - 1]["date"] if tr_ve - 1 < len(market_data) else None,
             "testStart": market_data[te_vs]["date"] if te_vs < len(market_data) else None,
@@ -197,16 +206,31 @@ def run_wfa(
             "isMetric": round(float(best_is), 4),
             "oosMetric": round(float(oos_mv), 4) if oos_mv is not None else None,
             "oosReturn": round(float(tm.get("totalReturn", 0)), 2),
-            "oosTrades": int(tm.get("totalTrades", 0)),
+            "oosTrades": oos_trades,
         })
 
     # ── Aggregate OOS performance on the stitched curve ──
-    summary = _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, len(fold_records))
+    summary = _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, fold_records)
     return {"folds": fold_records, "stitchedOOS": stitched, "summary": summary}
 
 
-def _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, n_folds) -> dict:
+def _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, fold_records) -> dict:
+    """
+    Build the WFA summary.
+
+    The efficiency ratio compares LIKE WITH LIKE: mean out-of-sample metric
+    across active folds, over mean in-sample metric across the same folds.
+    The earlier version divided the Sharpe of the *stitched aggregate* curve
+    by the *mean of per-fold* in-sample Sharpes — two different estimators
+    over different sample sizes, so the ratio was neither bounded nor
+    interpretable, and it was dominated by folds that never traded.
+    """
+    n_folds = len(fold_records)
+    active_folds = sum(1 for f in fold_records if f.get("active"))
+    idle_folds = n_folds - active_folds
+
     mean_is = float(np.mean(is_metrics)) if is_metrics else None
+    mean_oos = float(np.mean(oos_metrics)) if oos_metrics else None
 
     if len(stitched) >= 2:
         eq = np.array([p["equity"] for p in stitched], dtype=np.float64)
@@ -216,16 +240,15 @@ def _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, n_fol
     else:
         oos_sharpe = oos_total_return = oos_max_dd = 0.0
 
-    # Aggregate OOS metric for the efficiency ratio: Sharpe of the stitched
-    # curve for sharpe/calmar, else the realized total OOS return.
-    oos_aggregate = oos_sharpe if metric in ("sharpe", "calmar") else oos_total_return
-
     efficiency = None
-    if mean_is is not None and mean_is != 0:
-        efficiency = float(oos_aggregate / mean_is)
+    if mean_is is not None and mean_oos is not None and mean_is > 0:
+        # A non-positive mean in-sample metric means the optimizer never found
+        # an edge to begin with, so there is nothing for OOS to "retain" — the
+        # ratio would flip sign and read as spuriously strong.
+        efficiency = float(mean_oos / mean_is)
 
-    if efficiency is None:
-        verdict = "n/a"
+    if efficiency is None or active_folds < 3:
+        verdict = "inconclusive"
     elif efficiency >= 0.5:
         verdict = "robust"
     elif efficiency >= 0.2:
@@ -233,14 +256,28 @@ def _summarize(stitched, initial_capital, is_metrics, oos_metrics, metric, n_fol
     else:
         verdict = "overfit"
 
+    reason = None
+    if efficiency is None:
+        reason = ("No positive in-sample edge to test — the optimizer's best "
+                  "candidate had a non-positive metric on the train windows.")
+    elif active_folds < 3:
+        reason = (f"Only {active_folds} of {n_folds} folds traded out-of-sample; "
+                  f"too few active folds to judge robustness.")
+
     return {
         "metric": metric,
         "folds": n_folds,
+        "activeFolds": active_folds,
+        "idleFolds": idle_folds,
         "meanInSample": round(mean_is, 4) if mean_is is not None else None,
-        "oosAggregate": round(float(oos_aggregate), 4),
+        "meanOutOfSample": round(mean_oos, 4) if mean_oos is not None else None,
+        # Realized performance of the stitched OOS curve — reported alongside
+        # the ratio so a positive return with a shallow drawdown can't be
+        # hidden behind an "overfit" label.
         "oosSharpe": round(float(oos_sharpe), 4),
         "oosTotalReturn": round(oos_total_return, 2),
         "oosMaxDrawdown": round(oos_max_dd, 2),
         "wfaEfficiency": round(efficiency, 3) if efficiency is not None else None,
         "verdict": verdict,
+        "reason": reason,
     }
