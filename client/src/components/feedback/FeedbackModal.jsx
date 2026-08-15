@@ -3,6 +3,7 @@ import { CheckCircle2, CircleAlert } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { cx } from '../ui/styles';
+import { POST } from '../../services/apiClient';
 
 const RATING_STEPS = [1, 2, 3, 4, 5];
 
@@ -168,10 +169,15 @@ export default function FeedbackModal({ onClose }) {
     if (stillMissing.length > 0 || emailProblem) return;
 
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
-      setSubmitted(true);
-    }, 450);
+    POST('/api/feedback', responses)
+      .then(() => {
+        setSubmitting(false);
+        setSubmitted(true);
+      })
+      .catch((err) => {
+        setSubmitting(false);
+        setEmailError(err.message || 'Failed to submit feedback. Please try again.');
+      });
   };
 
   const resetForm = () => {
@@ -218,9 +224,7 @@ export default function FeedbackModal({ onClose }) {
           </div>
           <h3 className="tr-fb-success-title">Thank you for your feedback.</h3>
           <p className="tr-fb-success-text">
-            Your responses have been recorded for the TradeRetro team. This submission is
-            currently client-side only; a persistent feedback pipeline is planned for a
-            future release.
+            Feedback submitted successfully. Your response has been securely stored on the server.
           </p>
         </div>
       ) : (

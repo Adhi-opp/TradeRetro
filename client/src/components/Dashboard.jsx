@@ -189,8 +189,8 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
         </nav>
 
         <div className="sidebar-project-card">
-          <span className="card-label">STUDY PROJECT</span>
-          <p className="card-desc">Event-driven validation for retail algorithmic trading strategies.</p>
+          <span className="card-label">CAPSTONE RELEASE</span>
+          <p className="card-desc">Event-driven validation engine for algorithmic trading strategies.</p>
         </div>
 
         <button
@@ -241,7 +241,7 @@ export default function Dashboard({ onLogoClick, theme, onToggleTheme }) {
                   <p className="hero-subtitle">{activePage.description}</p>
                 </div>
                 <div className="hero-header-right">
-                  <button className="refresh-btn" onClick={() => window.location.reload()} title="Refresh Terminal">
+                  <button className="refresh-btn" onClick={() => useBacktestStore.getState().resetToDefaults()} title="Reset parameters to defaults">
                     Refresh
                   </button>
                 </div>

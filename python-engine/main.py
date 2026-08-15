@@ -28,21 +28,31 @@ from services.db import init_pool, close_pool
 from services.redis_client import init_redis, close_redis
 from services.scheduler import run_eod_scheduler
 from ai.router import router as ai_router
-from routers import backtest, signals, health, auth, ingestion, correlation, universe, live, quality, reconcile
+from routers import backtest, signals, health, auth, ingestion, correlation, universe, live, quality, reconcile, feedback
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize connection pool and Redis
-    await init_pool(settings.database_url)
-    await init_redis()
+    # Startup: initialize connection pool and Redis (with graceful fallback if services are offline)
+    try:
+        await init_pool(settings.database_url)
+    except Exception as exc:
+        logging.warning("Database connection unavailable (%s). Running in standalone memory/file mode.", exc)
+
+    try:
+        await init_redis()
+    except Exception as exc:
+        logging.warning("Redis connection unavailable (%s). Running without Redis streams.", exc)
 
     # Background scheduler: run EOD pipeline daily at 16:00 IST on weekdays.
     # Disable via DISABLE_EOD_SCHEDULER=1 (e.g. for tests or when running
     # multiple API replicas to avoid double-triggering).
     scheduler_task = None
     if not os.environ.get("DISABLE_EOD_SCHEDULER"):
-        scheduler_task = asyncio.create_task(run_eod_scheduler(), name="eod_scheduler")
+        try:
+            scheduler_task = asyncio.create_task(run_eod_scheduler(), name="eod_scheduler")
+        except Exception as exc:
+            logging.warning("EOD scheduler disabled: %s", exc)
 
     yield
 
@@ -77,6 +87,7 @@ app.include_router(universe.router)
 app.include_router(live.router)
 app.include_router(quality.router)
 app.include_router(reconcile.router)
+app.include_router(feedback.router)
 app.include_router(ai_router)
 
 

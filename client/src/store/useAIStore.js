@@ -40,6 +40,7 @@ const useAIStore = create((set, get) => ({
 
   models: [],
   selectedModel: null,
+  userApiKey: '',
   modelsLoading: false,
   modelsLoaded: false,
   modelsError: null,
@@ -66,6 +67,8 @@ const useAIStore = create((set, get) => ({
     set((s) => ({ inputValue: (text || '').trim(), focusRequest: s.focusRequest + 1 })),
 
   setSelectedModel: (model) => set({ selectedModel: model }),
+
+  setUserApiKey: (key) => set({ userApiKey: key || '' }),
 
   loadModels: async () => {
     if (get().modelsLoading) return;
@@ -105,7 +108,8 @@ const useAIStore = create((set, get) => ({
     try {
       const backtestState = useBacktestStore.getState();
       const contextPayload = buildAiContext({ backtest: backtestState });
-      const data = await generate(trimmed, get().selectedModel || undefined, contextPayload);
+      const apiKey = get().userApiKey.trim();
+      const data = await generate(trimmed, get().selectedModel || undefined, contextPayload, { apiKey: apiKey || undefined });
 
       if (!data?.success) {
         throw new Error(

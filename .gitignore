@@ -30,3 +30,6 @@ pgdata/
 
 # Temporary OpenCode workspace
 .opencode/
+
+# Temporary QA artifacts
+capture_screenshots.js

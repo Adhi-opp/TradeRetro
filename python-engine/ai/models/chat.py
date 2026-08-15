@@ -28,6 +28,7 @@ class ChatResponse(BaseModel):
 class GenerateRequest(BaseModel):
     user_query: str = Field(..., description="User query text")
     provider_name: str = Field(default="qwen2.5-coder-1.5b-instruct", description="LLM provider identifier")
+    api_key: Optional[str] = Field(default=None, description="Transient, single-request API key (never persisted)")
     mode: AnalysisMode = Field(default=AnalysisMode.CHAT, description="Analysis mode for the pipeline")
     market_data: Optional[dict] = Field(default=None, description="Market context data")
     strategy_data: Optional[dict] = Field(default=None, description="Strategy context data")

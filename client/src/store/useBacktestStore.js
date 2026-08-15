@@ -134,6 +134,35 @@ const useBacktestStore = create((set, get) => ({
       set({ loading: false });
     }
   },
+
+  resetToDefaults: () => set({
+    ticker: 'RELIANCE.NS',
+    startDate: '2024-09-01',
+    endDate: new Date().toISOString().split('T')[0],
+    capital: 100000,
+    applyCosts: false,
+
+    strategyType: 'MOVING_AVERAGE_CROSSOVER',
+    fastSma: 20,
+    slowSma: 50,
+    rsiPeriod: 14,
+    oversold: 30,
+    overbought: 70,
+    bbPeriod: 20,
+    bbStdDev: 2.0,
+    dcPeriod: 20,
+
+    riskEnabled: false,
+    riskPct: 2,
+    stopLossPct: 8,
+
+    result: null,
+    loading: false,
+    error: null,
+    ranTicker: null,
+    ranRange: null,
+    ranStrategyParams: null,
+  }),
 }));
 
 export default useBacktestStore;

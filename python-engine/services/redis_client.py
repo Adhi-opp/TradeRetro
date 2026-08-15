@@ -84,8 +84,11 @@ async def latest_quotes(symbols: list[str]) -> dict[str, dict]:
     import json
     if not symbols:
         return {}
-    r = get_redis()
-    raw_values = await r.hmget(LATEST_TICK_HASH, symbols)
+    try:
+        r = get_redis()
+        raw_values = await r.hmget(LATEST_TICK_HASH, symbols)
+    except Exception:
+        return {}
     out: dict[str, dict] = {}
     for sym, raw in zip(symbols, raw_values):
         if not raw:
