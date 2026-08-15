@@ -1,4 +1,5 @@
 import { Sun, Moon, ArrowRight } from 'lucide-react';
+import PRODUCT from '../constants/product';
 
 /**
  * Ambient horizon: a strategy curve against its benchmark, drawn once at
@@ -102,7 +103,7 @@ export default function Landing({ onEnter, theme, onToggleTheme }) {
           <span>Prefect</span>
           <span>FastAPI</span>
           <span>React</span>
-          <span className="lnd-foot-ver">v0.4</span>
+          <span className="lnd-foot-ver">{PRODUCT.version}</span>
         </div>
       </main>
     </div>

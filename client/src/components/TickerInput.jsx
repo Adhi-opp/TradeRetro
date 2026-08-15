@@ -1,36 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Check, AlertCircle, Loader } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, AlertCircle, Loader } from 'lucide-react';
 
 const API = 'http://localhost:8000';
 
-/**
- * Free-text ticker input with autocomplete over the user universe
- * and an "add ticker" flow that triggers on-demand backfill.
- *
- * Props:
- *   value: controlled storage key (e.g. "RELIANCE.NS")
- *   onChange: fires with the resolved storage key
- *   onAdded: optional, fires after a brand-new ticker finishes backfill
- *   assetClassFilter: optional array, e.g. ['equity','index']
- *   label: input label
- */
-export default function TickerInput({ value, onChange, onAdded, assetClassFilter, label = 'Ticker', disabled }) {
+export default function TickerInput({ value, onChange, onAdded, assetClassFilter, label = 'Select Asset', disabled }) {
   const [universe, setUniverse] = useState([]);
-  const [query, setQuery] = useState(value || '');
-  const [focused, setFocused] = useState(false);
-  const [addState, setAddState] = useState({ status: 'idle' }); // idle | adding | polling | error
+  const [localValue, setLocalValue] = useState(value || '');
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState('');
+  const [addState, setAddState] = useState({ status: 'idle' });
   const pollRef = useRef(null);
 
-  useEffect(() => setQuery(value || ''), [value]);
+  useEffect(() => setLocalValue(value || ''), [value]);
 
   async function refreshUniverse() {
     try {
       const res = await fetch(`${API}/api/universe`);
       const data = await res.json();
       setUniverse(Array.isArray(data) ? data : []);
-    } catch (e) {
-      // non-fatal; autocomplete just won't populate
-    }
+    } catch (e) {}
   }
 
   useEffect(() => {
@@ -38,25 +26,9 @@ export default function TickerInput({ value, onChange, onAdded, assetClassFilter
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toUpperCase();
-    const base = assetClassFilter
-      ? universe.filter(u => assetClassFilter.includes(u.asset_class))
-      : universe;
-    if (!q) return base.slice(0, 8);
-    return base
-      .filter(u => u.symbol.toUpperCase().includes(q) || (u.display_name || '').toUpperCase().includes(q))
-      .slice(0, 8);
-  }, [query, universe, assetClassFilter]);
-
-  const existsInUniverse = useMemo(() => {
-    const q = query.trim().toUpperCase();
-    return universe.some(u =>
-      u.symbol.toUpperCase() === q
-      || u.symbol.toUpperCase() === `${q}.NS`
-      || (u.display_name || '').toUpperCase() === q
-    );
-  }, [query, universe]);
+  const filtered = assetClassFilter
+    ? universe.filter(u => assetClassFilter.includes(u.asset_class))
+    : universe;
 
   const pollJob = (jobId, symbol) => {
     setAddState({ status: 'polling', jobId, symbol });
@@ -69,7 +41,10 @@ export default function TickerInput({ value, onChange, onAdded, assetClassFilter
           clearInterval(pollRef.current);
           await refreshUniverse();
           setAddState({ status: 'idle' });
+          setAddOpen(false);
+          setAddQuery('');
           if (onAdded) onAdded(symbol);
+          setLocalValue(symbol);
           onChange(symbol);
         } else if (d.status === 'failed') {
           clearInterval(pollRef.current);
@@ -83,7 +58,7 @@ export default function TickerInput({ value, onChange, onAdded, assetClassFilter
   };
 
   const handleAdd = async () => {
-    const raw = query.trim();
+    const raw = addQuery.trim();
     if (!raw) return;
     setAddState({ status: 'adding' });
     try {
@@ -100,88 +75,98 @@ export default function TickerInput({ value, onChange, onAdded, assetClassFilter
       if (data.backfill_status === 'completed') {
         await refreshUniverse();
         setAddState({ status: 'idle' });
+        setAddOpen(false);
+        setAddQuery('');
         onChange(data.symbol);
+        setLocalValue(data.symbol);
         if (onAdded) onAdded(data.symbol);
       } else if (data.job_id) {
         pollJob(data.job_id, data.symbol);
       } else {
         setAddState({ status: 'idle' });
+        setAddOpen(false);
       }
     } catch (e) {
       setAddState({ status: 'error', message: e.message });
     }
   };
 
-  const handleSelect = (u) => {
-    onChange(u.symbol);
-    setQuery(u.symbol);
-    setFocused(false);
+  const handleSelect = (symbol) => {
+    setLocalValue(symbol);
+    onChange(symbol);
   };
 
   return (
     <div className="form-field ticker-input">
       <label>{label}</label>
-      <div className="ticker-input-row">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 120)}
-          placeholder="Type ticker (e.g. RELIANCE, TCS.NS, USDINR)"
+      <div className="ticker-select-row">
+        <select
+          value={localValue}
+          onChange={(e) => handleSelect(e.target.value)}
           disabled={disabled || addState.status === 'polling' || addState.status === 'adding'}
-          spellCheck={false}
-          autoComplete="off"
-        />
-        {!existsInUniverse && query.trim() && (
-          <button
-            type="button"
-            className="ticker-add-btn"
-            onClick={handleAdd}
-            disabled={disabled || addState.status === 'polling' || addState.status === 'adding'}
-            title="Add to universe and backfill history"
-          >
-            {addState.status === 'adding' || addState.status === 'polling'
-              ? <Loader size={14} className="spin-icon" />
-              : <Plus size={14} />}
-            Add
-          </button>
-        )}
-        {existsInUniverse && (
-          <span className="ticker-ok-badge" title="In universe">
-            <Check size={13} />
-          </span>
-        )}
+          className="ticker-select"
+        >
+          <option value="" disabled>— Select an asset —</option>
+          {filtered.map(u => (
+            <option key={u.symbol} value={u.symbol}>
+              {u.symbol} — {u.display_name} ({u.asset_class})
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="ticker-open-add-btn"
+          onClick={() => { setAddOpen(true); setAddState({ status: 'idle' }); }}
+          disabled={disabled}
+          title="Add a new ticker"
+        >
+          <Plus size={14} />
+        </button>
       </div>
 
-      {focused && filtered.length > 0 && (
-        <div className="ticker-dropdown">
-          {filtered.map(u => (
+      {addOpen && (
+        <div className="ticker-add-panel">
+          <div className="ticker-add-row">
+            <input
+              type="text"
+              value={addQuery}
+              onChange={(e) => setAddQuery(e.target.value)}
+              placeholder="Symbol (e.g. MARUTI.NS, AAPL)"
+              disabled={addState.status === 'adding' || addState.status === 'polling'}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAddOpen(false); }}
+            />
             <button
-              key={u.symbol}
               type="button"
-              className="ticker-option"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleSelect(u)}
+              className="ticker-add-btn"
+              onClick={handleAdd}
+              disabled={!addQuery.trim() || addState.status === 'adding' || addState.status === 'polling'}
             >
-              <span className="ticker-option-sym">{u.symbol}</span>
-              <span className="ticker-option-name">{u.display_name}</span>
-              <span className={`ticker-option-ac ac-${u.asset_class}`}>{u.asset_class}</span>
+              {addState.status === 'adding' || addState.status === 'polling'
+                ? <Loader size={14} className="spin-icon" />
+                : <Plus size={14} />}
+              {addState.status === 'polling' ? 'Backfilling...' : 'Add & Backfill'}
             </button>
-          ))}
-        </div>
-      )}
-
-      {addState.status === 'polling' && (
-        <div className="ticker-add-status">
-          <Loader size={12} className="spin-icon" />
-          Backfilling {addState.symbol}… (~5-15s)
-        </div>
-      )}
-      {addState.status === 'error' && (
-        <div className="ticker-add-status ticker-add-error">
-          <AlertCircle size={12} />
-          {addState.message}
+            <button
+              type="button"
+              className="ticker-cancel-btn"
+              onClick={() => { setAddOpen(false); setAddState({ status: 'idle' }); }}
+            >
+              Cancel
+            </button>
+          </div>
+          {addState.status === 'polling' && (
+            <div className="ticker-add-status">
+              <Loader size={12} className="spin-icon" />
+              Backfilling {addState.symbol}… (~5-15s)
+            </div>
+          )}
+          {addState.status === 'error' && (
+            <div className="ticker-add-status ticker-add-error">
+              <AlertCircle size={12} />
+              {addState.message}
+            </div>
+          )}
         </div>
       )}
     </div>

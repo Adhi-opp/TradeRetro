@@ -12,6 +12,7 @@ is flowing - at which point the quote endpoint will prefer Redis.
 """
 
 import logging
+import math
 from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Query
@@ -147,6 +148,8 @@ async def quotes(symbols: list[str] = Query(...)):
         if is_fresh:
             try:
                 last = float(live_tick["ltp"])
+                if not math.isfinite(last):
+                    raise ValueError(f"non-finite ltp: {live_tick['ltp']}")
             except (KeyError, TypeError, ValueError):
                 is_fresh = False
 
