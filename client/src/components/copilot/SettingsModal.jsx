@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, ChevronDown, Key, Cpu, Cloud, Check, Lock, ShieldCheck } from 'lucide-react';
+import { X, Key, Cpu, Cloud, Check, Lock, ShieldCheck } from 'lucide-react';
 import useAIStore from '../../store/useAIStore';
+import ModelPickerDropdown from './ModelPickerDropdown';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const models = useAIStore((s) => s.models);
@@ -14,10 +15,6 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [configuredFeedback, setConfiguredFeedback] = useState(false);
 
   if (!isOpen) return null;
-
-  // Group models into LM Studio (local) vs Cloud
-  const lmStudioModels = models.filter((m) => m.local || m.provider === 'openai-compatible' || m.provider === 'ollama' || m.provider === 'mock');
-  const cloudModels = models.filter((m) => !m.local && m.provider !== 'openai-compatible' && m.provider !== 'ollama' && m.provider !== 'mock');
 
   // Selected model info
   const activeModelObj = models.find((m) => m.id === selectedModel);
@@ -60,39 +57,14 @@ export default function SettingsModal({ isOpen, onClose }) {
               MODEL PROVIDER &amp; SELECTION
             </label>
 
-            <div className="ai-select-container">
-              <select
+            <div className="ai-model-picker-wrap">
+              <ModelPickerDropdown
                 id="ai-settings-model-select"
-                className="ai-model-select"
-                value={selectedModel || ''}
-                onChange={(e) => handleSelectModel(e.target.value)}
-                aria-label="Select AI Model"
-              >
-                <option value="">Default: LM Studio — Qwen 2.5 Coder 1.5B</option>
-
-                {lmStudioModels.length > 0 && (
-                  <optgroup label="LM Studio (Local Models)">
-                    {lmStudioModels.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.display_name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-
-                {cloudModels.length > 0 && (
-                  <optgroup label="Cloud Providers">
-                    {cloudModels.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.display_name}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              <div className="ai-select-icon-wrap" aria-hidden="true">
-                <ChevronDown size={14} />
-              </div>
+                models={models}
+                selectedModel={selectedModel}
+                onSelect={handleSelectModel}
+                disabled={models.length === 0}
+              />
             </div>
 
             <div className="ai-model-badge-row">

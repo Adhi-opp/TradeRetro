@@ -137,9 +137,10 @@ function MissingLabel({ label }) {
 /**
  * Native TradeRetro feedback survey.
  *
- * Demo-level submission: no feedback persistence backend exists, so the form
- * validates locally and ends in a client-side success state. Nothing is
- * claimed to be stored server-side.
+ * Submissions POST /api/feedback and are validated server-side, where they
+ * are persisted as structured text files under python-engine/feedback/.
+ * The form requires the ten core survey answers (ratings/choices) before it
+ * will submit; any missing requirement is listed in the error banner.
  */
 export default function FeedbackModal({ onClose }) {
   const [responses, setResponses] = useState(INITIAL_RESPONSES);
@@ -168,8 +169,14 @@ export default function FeedbackModal({ onClose }) {
 
     if (stillMissing.length > 0 || emailProblem) return;
 
+    // Server-side survey fields are strings; coerce numbers (1–5 ratings) so
+    // the payload validates against the Pydantic schema.
+    const payload = Object.fromEntries(
+      Object.entries(responses).map(([key, value]) => [key, value === null ? '' : String(value)]),
+    );
+
     setSubmitting(true);
-    POST('/api/feedback', responses)
+    POST('/api/feedback', payload)
       .then(() => {
         setSubmitting(false);
         setSubmitted(true);

@@ -10,6 +10,7 @@ export default function CopilotHeader() {
   const models = useAIStore((s) => s.models);
   const selectedModel = useAIStore((s) => s.selectedModel);
   const error = useAIStore((s) => s.error);
+  const providerStatus = useAIStore((s) => s.providerStatus);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -17,7 +18,8 @@ export default function CopilotHeader() {
   const activeModelObj = models.find((m) => m.id === selectedModel);
   const currentModelName = activeModelObj ? activeModelObj.display_name : 'Qwen 2.5 Coder 1.5B';
 
-  // Availability calculation
+  // Availability calculation: a probe result of "unavailable", or a request
+  // error matching an outage pattern, flips the header to Not Available.
   const isErrorState = !!error && (
     error.toLowerCase().includes('unavailable') ||
     error.toLowerCase().includes('not reached') ||
@@ -25,7 +27,7 @@ export default function CopilotHeader() {
     error.toLowerCase().includes('failed to fetch')
   );
 
-  const isAvailable = !isErrorState;
+  const isAvailable = providerStatus !== 'unavailable' && !isErrorState;
 
   return (
     <>

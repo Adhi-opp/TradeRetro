@@ -32,4 +32,5 @@ pgdata/
 .opencode/
 
 # Temporary QA artifacts
+*.tmp.mjs
 capture_screenshots.js

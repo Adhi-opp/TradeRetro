@@ -8,6 +8,61 @@ function nextId() {
   return `msg_${Date.now()}_${_nextId++}`;
 }
 
+// Lightweight provider reachability probes for local engines. These are pure
+// frontend checks (opaque CORS fetch) that do NOT touch the provider system:
+// they only determine whether the underlying local server is reachable.
+const LM_STUDIO_PROBE_URL = 'http://localhost:1234/v1/models';
+const OLLAMA_PROBE_URL = 'http://localhost:11434/api/tags';
+const PROBE_TIMEOUT_MS = 2500;
+const PROBE_CACHE_MS = 8000;
+
+const _probeCache = new Map();
+let _probeInFlight = null;
+
+async function probeUrl(url) {
+  const cached = _probeCache.get(url);
+  if (cached != null && Date.now() - cached.at < PROBE_CACHE_MS) return cached.ok;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    let ok = true;
+    try {
+      // no-cors returns an opaque response (status 0) whenever the server is
+      // actually reachable, regardless of CORS headers; an unreachable or
+      // timed-out server rejects with a TypeError.
+      await fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+    } catch {
+      ok = false;
+    } finally {
+      clearTimeout(timer);
+    }
+    _probeCache.set(url, { at: Date.now(), ok });
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+// Provider outage message patterns that should flip the header to Not Available.
+function isOutageMessage(text) {
+  const t = (text || '').toString().toLowerCase();
+  return (
+    t.includes('unavailable') ||
+    t.includes('not reached') ||
+    t.includes('connection refused') ||
+    t.includes('failed to fetch') ||
+    t.includes('could not be reached') ||
+    t.includes('cannot connect')
+  );
+}
+
+function providerProbeUrl(model) {
+  if (!model) return null;
+  if (model.provider === 'ollama') return OLLAMA_PROBE_URL;
+  if (model.provider === 'openai-compatible') return LM_STUDIO_PROBE_URL;
+  return null;
+}
+
 function friendlyProviderError(errorText) {
   const text = (errorText || '').toString();
   const t = text.toLowerCase();
@@ -45,6 +100,10 @@ const useAIStore = create((set, get) => ({
   modelsLoaded: false,
   modelsError: null,
 
+  // Provider availability state shown in the Copilot header:
+  // 'unknown' | 'ready' | 'unavailable'
+  providerStatus: 'unknown',
+
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
 
   closePanel: () => set({ panelOpen: false }),
@@ -66,9 +125,48 @@ const useAIStore = create((set, get) => ({
   setDraftPrompt: (text) =>
     set((s) => ({ inputValue: (text || '').trim(), focusRequest: s.focusRequest + 1 })),
 
-  setSelectedModel: (model) => set({ selectedModel: model }),
+  setSelectedModel: (model) => {
+    set({ selectedModel: model });
+    get().checkProviderAvailability();
+  },
 
   setUserApiKey: (key) => set({ userApiKey: key || '' }),
+
+  checkProviderAvailability: async () => {
+    const state = get();
+    if (state.modelsError) {
+      set({ providerStatus: 'unavailable' });
+      return;
+    }
+    const models = state.models;
+    const active =
+      models.find((m) => m.id === state.selectedModel) ||
+      models.find((m) => m.id === 'qwen2.5-coder-1.5b-instruct') ||
+      models[0] ||
+      null;
+
+    if (!active) {
+      set({ providerStatus: 'unavailable' });
+      return;
+    }
+
+    // Cloud providers (gemini/openai) cannot be cheaply verified here; keep
+    // the existing request state as the source of truth for them.
+    const url = providerProbeUrl(active);
+    if (!url) {
+      set({ providerStatus: 'unknown' });
+      return;
+    }
+
+    if (_probeInFlight) return;
+    _probeInFlight = true;
+    try {
+      const ok = await probeUrl(url);
+      set({ providerStatus: ok ? 'ready' : 'unavailable' });
+    } finally {
+      _probeInFlight = null;
+    }
+  },
 
   loadModels: async () => {
     if (get().modelsLoading) return;
@@ -81,6 +179,7 @@ const useAIStore = create((set, get) => ({
           )
         : [];
       set({ models, modelsLoading: false, modelsLoaded: true });
+      get().checkProviderAvailability();
     } catch (err) {
       set({
         modelsLoading: false,
@@ -155,10 +254,13 @@ const useAIStore = create((set, get) => ({
         messages: [...s.messages, assistantMsg],
         loading: false,
       }));
+      set({ providerStatus: 'ready' });
     } catch (err) {
+      const message = err?.message || 'Unable to contact AI. Please try again.';
       set({
-        error: err?.message || 'Unable to contact AI. Please try again.',
+        error: message,
         loading: false,
+        providerStatus: isOutageMessage(message) ? 'unavailable' : get().providerStatus,
       });
     }
   },

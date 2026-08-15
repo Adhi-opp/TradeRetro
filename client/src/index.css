@@ -8630,6 +8630,19 @@ tbody tr:hover {
   word-break: break-word !important;
 }
 
+/* Capstone card no-shrink guard: the card and the version footer below it
+   must never be flex-squeezed into clipping/overflow, in any sidebar state. */
+.app-shell-v2 .sidebar-project-card {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+}
+
+.app-shell-v2 .sidebar-pin-btn,
+.app-shell-v2 .sidebar-version {
+  flex-shrink: 0 !important;
+}
+
 .app-shell-v2:not(.sidebar-pinned) .app-sidebar-v2:not(:hover):not(:focus-within) .sidebar-project-card {
   height: 0 !important;
   min-height: 0 !important;
@@ -9915,7 +9928,9 @@ html, body, #root {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden !important;
+  /* Visible so the grouped model dropdown can open above the dialog instead
+     of being clipped by an overflow:hidden edge. */
+  overflow: visible !important;
 }
 
 .ai-settings-header {
@@ -9924,6 +9939,7 @@ html, body, #root {
   justify-content: space-between !important;
   padding: 18px 20px !important;
   border-bottom: 1px solid var(--border) !important;
+  border-radius: 12px 12px 0 0 !important;
   background: var(--bg-root) !important;
 }
 
@@ -9975,19 +9991,126 @@ html, body, #root {
   text-transform: uppercase !important;
 }
 
-.ai-model-select optgroup {
-  background: var(--bg-root) !important;
-  color: var(--primary) !important;
-  font-weight: 700 !important;
-  padding: 6px 0 !important;
-  font-style: normal !important;
+/* ── Custom grouped model picker ─────────────────────────── */
+.ai-model-picker {
+  position: relative !important;
+  width: 100% !important;
 }
 
-.ai-model-select option {
-  background: var(--bg-panel) !important;
+.ai-model-picker-wrap {
+  width: 100% !important;
+}
+
+.ai-model-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  background: var(--bg-input) !important;
   color: var(--text-primary) !important;
-  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: border-color 150ms var(--ease), background 150ms var(--ease) !important;
+}
+
+.ai-model-trigger:hover:not(:disabled) {
+  border-color: var(--primary) !important;
+}
+
+.ai-model-trigger:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+}
+
+.ai-model-trigger-label {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ai-model-trigger-chevron {
+  flex: 0 0 auto !important;
+  color: var(--text-muted) !important;
+  transition: transform 160ms var(--ease), color 160ms var(--ease) !important;
+}
+
+.ai-model-trigger-chevron.is-open {
+  transform: rotate(180deg) !important;
+  color: var(--primary) !important;
+}
+
+.ai-model-dropdown {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 60 !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  background: var(--bg-panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.55) !important;
+  padding: 6px !important;
+  animation: fadeIn 120ms var(--ease) !important;
+}
+
+.ai-model-group + .ai-model-group {
+  margin-top: 4px !important;
+  padding-top: 6px !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.ai-model-group-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 8px 2px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--primary) !important;
+}
+
+.ai-model-option {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 7px 8px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  font-size: 12.5px !important;
   font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: background 120ms var(--ease), color 120ms var(--ease) !important;
+}
+
+.ai-model-option:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.ai-model-option.is-selected {
+  background: rgba(245, 158, 11, 0.1) !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+}
+
+.ai-model-option-check {
+  color: var(--primary) !important;
+  flex-shrink: 0 !important;
 }
 
 .ai-model-badge-row {
