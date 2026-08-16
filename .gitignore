@@ -30,3 +30,21 @@ pgdata/
 
 # Temporary OpenCode workspace
 .opencode/
+
+# Temporary QA artifacts
+*.tmp.mjs
+capture_screenshots.js
+
+# TradeRetro local QA / temporary files
+.final-qa.tmp.mjs
+.fb-debug.tmp.mjs
+
+# Documentation build / generation artifacts
+docs/assets/
+docs/__pycache__/
+docs/_pdf_helpers.py
+docs/generate_pdf_ai.py
+docs/generate_pdf_frontend.py
+
+# Local-only design notes
+docs/design-decisions.md

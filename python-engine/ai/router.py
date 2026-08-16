@@ -46,6 +46,7 @@ async def generate(body: GenerateRequest) -> GenerateResponse:
         user_query=body.user_query,
         mode=body.mode,
         provider_name=body.provider_name,
+        api_key=body.api_key,
         market_data=body.market_data,
         strategy_data=body.strategy_data,
         backtest_data=body.backtest_data,

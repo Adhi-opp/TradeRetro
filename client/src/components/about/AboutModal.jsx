@@ -38,7 +38,7 @@ const TECHNOLOGY = [
   { area: 'Data', value: 'TimescaleDB' },
   { area: 'Streaming / Workflow', value: 'Redis + Prefect' },
   { area: 'Visualization', value: 'Recharts + Grafana' },
-  { area: 'AI', value: 'AI Copilot · OpenAI-compatible providers · LM Studio' },
+  { area: 'AI', value: 'AI Copilot · LM Studio · Gemini-Compatible Providers · OpenAI-compatible Providers' },
 ];
 
 const ROADMAP = [
@@ -49,6 +49,8 @@ const ROADMAP = [
   'Strategy optimization',
   'Market-regime analysis',
   'Expanded AI-assisted analysis',
+  'AI Agent / autonomous research assistance (Planned / Deferred — considered but deferred due to scope constraints)',
+  'UI modernization and migration toward industry-standard Next.js architecture',
 ];
 
 function Section({ title, children }) {
@@ -156,16 +158,16 @@ export default function AboutModal({ onClose }) {
         </Section>
 
         <Section title="Project Team">
-          <List items={['[YOUR NAME]', '[TEAMMATE 1]', '[TEAMMATE 2]', '[TEAMMATE 3]']} />
+          <List items={['SHAURYA SINGH', 'ADHIRAJ SINGH', 'SHREYASH CHAUGULE', 'LAVANYA.N']} />
           <p className="tr-about-copy tr-about-copy-muted">
-            Special thanks to our supervisor and mentor, Mr. Raj Kumar, for their continuous
+            Special thanks to our supervisor and mentor, <strong>Mr. Raj Kumar</strong>, for their continuous
             guidance, feedback, encouragement, and support throughout the TradeRetro project journey.
           </p>
         </Section>
 
         <div className="tr-about-version">
           <span className="tr-about-version-number mono">{PRODUCT.version}</span>
-          <span className="tr-about-version-title">{PRODUCT.releaseTitle}</span>
+          <span className="tr-about-version-title">Capstone Project Release</span>
         </div>
       </div>
     </Modal>

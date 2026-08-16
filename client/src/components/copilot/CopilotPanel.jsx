@@ -15,10 +15,15 @@ export default function CopilotPanel() {
   const modelsLoaded = useAIStore((s) => s.modelsLoaded);
   const modelsError = useAIStore((s) => s.modelsError);
   const loadModels = useAIStore((s) => s.loadModels);
+  const checkProviderAvailability = useAIStore((s) => s.checkProviderAvailability);
 
   useEffect(() => {
     if (panelOpen && (!modelsLoaded || modelsError)) loadModels();
   }, [panelOpen, modelsLoaded, modelsError, loadModels]);
+
+  useEffect(() => {
+    if (panelOpen) checkProviderAvailability();
+  }, [panelOpen, checkProviderAvailability]);
 
   useEffect(() => {
     if (hasMessages && !prevHasMsgs.current) {

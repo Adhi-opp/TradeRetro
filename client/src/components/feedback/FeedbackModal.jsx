@@ -3,6 +3,7 @@ import { CheckCircle2, CircleAlert } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { cx } from '../ui/styles';
+import { POST } from '../../services/apiClient';
 
 const RATING_STEPS = [1, 2, 3, 4, 5];
 
@@ -136,9 +137,10 @@ function MissingLabel({ label }) {
 /**
  * Native TradeRetro feedback survey.
  *
- * Demo-level submission: no feedback persistence backend exists, so the form
- * validates locally and ends in a client-side success state. Nothing is
- * claimed to be stored server-side.
+ * Submissions POST /api/feedback and are validated server-side, where they
+ * are persisted as structured text files under python-engine/feedback/.
+ * The form requires the ten core survey answers (ratings/choices) before it
+ * will submit; any missing requirement is listed in the error banner.
  */
 export default function FeedbackModal({ onClose }) {
   const [responses, setResponses] = useState(INITIAL_RESPONSES);
@@ -167,11 +169,22 @@ export default function FeedbackModal({ onClose }) {
 
     if (stillMissing.length > 0 || emailProblem) return;
 
+    // Server-side survey fields are strings; coerce numbers (1–5 ratings) so
+    // the payload validates against the Pydantic schema.
+    const payload = Object.fromEntries(
+      Object.entries(responses).map(([key, value]) => [key, value === null ? '' : String(value)]),
+    );
+
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
-      setSubmitted(true);
-    }, 450);
+    POST('/api/feedback', payload)
+      .then(() => {
+        setSubmitting(false);
+        setSubmitted(true);
+      })
+      .catch((err) => {
+        setSubmitting(false);
+        setEmailError(err.message || 'Failed to submit feedback. Please try again.');
+      });
   };
 
   const resetForm = () => {
@@ -218,9 +231,7 @@ export default function FeedbackModal({ onClose }) {
           </div>
           <h3 className="tr-fb-success-title">Thank you for your feedback.</h3>
           <p className="tr-fb-success-text">
-            Your responses have been recorded for the TradeRetro team. This submission is
-            currently client-side only; a persistent feedback pipeline is planned for a
-            future release.
+            Feedback submitted successfully. Your response has been securely stored on the server.
           </p>
         </div>
       ) : (

@@ -13,6 +13,7 @@ import ChartWidget from './ChartWidget';
 import RiskMetricsGrid from './RiskMetricsGrid';
 import MonthlyHeatmap from './MonthlyHeatmap';
 import ReturnDistribution from './ReturnDistribution';
+import StrategyAssessment from './StrategyAssessment';
 import ParameterSweep from './ParameterSweep';
 import WalkForward from './WalkForward';
 
@@ -314,6 +315,14 @@ export default function TearsheetGrid({ theme }) {
   return (
     <div className="tearsheet">
       <KpiRibbon metrics={metrics} analytics={analytics} />
+
+      <StrategyAssessment
+        metrics={metrics}
+        analytics={analytics}
+        ranTicker={ranTicker}
+        ranRange={ranRange}
+        strategyType={ranStrategyParams?.strategyType}
+      />
 
       {/* Row 1 — 70 / 30 : equity curve | execution stats */}
       <div className="ts-row ts-row-7030">

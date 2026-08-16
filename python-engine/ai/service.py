@@ -47,6 +47,7 @@ class AIService:
         user_query: str,
         mode: AnalysisMode = AnalysisMode.CHAT,
         provider_name: Optional[str] = None,
+        api_key: Optional[str] = None,
         market_data: Optional[Dict[str, Any]] = None,
         strategy_data: Optional[Dict[str, Any]] = None,
         backtest_data: Optional[Dict[str, Any]] = None,
@@ -87,7 +88,7 @@ class AIService:
                 provider_name, len(prompt),
             )
 
-            provider = self.provider_factory.get_provider(provider_name)
+            provider = self.provider_factory.get_provider(provider_name, override_api_key=api_key)
             logger.info("Request sent to %s", type(provider).__name__)
 
             raw_response_str = provider.generate_response(prompt)

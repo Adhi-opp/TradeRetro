@@ -42,7 +42,7 @@ class AIProviderFactory:
         """
         self._config = config or AIConfig()
 
-    def get_provider(self, model_or_provider: str = "mock") -> BaseLLMProvider:
+    def get_provider(self, model_or_provider: str = "mock", override_api_key: Optional[str] = None) -> BaseLLMProvider:
         """Returns an LLM provider instance for the given model or provider name.
 
         Resolution order:
@@ -82,7 +82,7 @@ class AIProviderFactory:
             return cls(
                 model=resolved_model_id or self._config.model,
                 base_url=self._config.openai_compatible_base_url,
-                api_key=self._config.openai_compatible_api_key,
+                api_key=override_api_key or self._config.openai_compatible_api_key,
                 temperature=self._config.temperature,
                 max_tokens=self._config.max_tokens,
             )
@@ -99,7 +99,7 @@ class AIProviderFactory:
         if provider_type == "gemini":
             return cls(
                 model=resolved_model_id or self._config.gemini_model,
-                api_key=self._config.gemini_api_key,
+                api_key=override_api_key or self._config.gemini_api_key,
                 base_url=self._config.gemini_base_url,
                 temperature=self._config.temperature,
                 max_tokens=self._config.max_tokens,

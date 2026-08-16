@@ -32,6 +32,7 @@ export async function generate(userQuery, providerName, contextPayload = {}, opt
     ...contextPayload,
   };
   if (providerName) body.provider_name = providerName;
+  if (options.apiKey) body.api_key = options.apiKey;
   return POST('/api/ai/generate', body, { timeoutMs: 60000 });
 }
 

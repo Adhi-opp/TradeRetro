@@ -53,9 +53,9 @@ The following limitations apply to the current implementation. These are known c
 
 | Limitation | Description |
 |---|---|
-| **Settings Button Disabled** | The settings button in the Copilot header is present but disabled — it cannot be used to change provider/model. Model selection is handled by the model dropdown in the Copilot header (populated from `GET /api/ai/models`), and the selected model is sent as `provider_name` on generate requests. |
+| **Client-Side Model Configuration Scope** | Model selection and custom API keys configured in the settings modal (`SettingsModal`) are managed in client-side state (`useAIStore`). Changing backend server-level defaults still requires configuration updates on the server. |
 | **In-Memory Conversation Only** | The conversation is held in the client-side Zustand store and is lost on page reload. There is no persistence and no server-side conversation memory. |
-| **Quick Actions Disabled** | The quick-action cards in the Copilot panel are visual placeholders and are not yet wired to send prompts. |
+| **Quick Actions Populate Draft Prompts** | Quick-action cards populate draft prompts into the input area for review rather than auto-submitting them to the server immediately. |
 
 ## Security Limitations
 
