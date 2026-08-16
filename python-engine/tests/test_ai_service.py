@@ -27,8 +27,9 @@ class _StubFactory:
         self.provider = provider
         self.requested = None
 
-    def get_provider(self, name):
+    def get_provider(self, name, override_api_key=None):
         self.requested = name
+        self.requested_api_key = override_api_key
         return self.provider
 
 
@@ -39,7 +40,7 @@ class _RaisingFactory:
     def __init__(self, exc):
         self.exc = exc
 
-    def get_provider(self, name):
+    def get_provider(self, name, override_api_key=None):
         raise self.exc
 
 
