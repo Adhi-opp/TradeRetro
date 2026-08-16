@@ -19,24 +19,19 @@ This document describes completed milestones and planned improvements to the AI 
 
 ## Short-Term (Next 1–2 Milestones)
 
-### Model Selection UI
-- ✅ Model dropdown in the Copilot panel, populated from `GET /api/ai/models` (`ModelSelector`)
-- ✅ Selected model sent via `provider_name` on generate requests
-- Enable the currently disabled settings button to pick provider/model
-
 ### Streaming Support
 - Implement Server-Sent Events (SSE) for token-by-token streaming
 - Add a new streaming endpoint (e.g., `POST /api/ai/generate/stream`)
 - Update the frontend chat to consume streaming responses for real-time display
 
-### Environment Variable Configuration
-- Support overriding `AIConfig` fields via environment variables
-- Example: `AI_PROVIDER`, `AI_MODEL`, `AI_TEMPERATURE`, `AI_BASE_URL`
-- Fall back to hardcoded defaults if env vars are not set
+### Broader Configuration & Overrides
+- Support overriding broader `AIConfig` fields via environment variables for local provider settings (e.g., LM Studio port, base URLs, default sampling parameters)
+- Per-provider configuration profiles (different timeouts, base URLs, models per provider instance)
+- Runtime configuration API to read/update settings dynamically
 
-### Enable Quick Actions
-- Wire the visual quick-action cards to send prebuilt prompts
-- Add example prompts as clickable suggestions in the empty state
+### Enhanced Prompt & Quick-Action Suggestions
+- Add dynamic prompt suggestions in empty state based on active backtest metrics and strategy type
+- Expand quick-action templates with domain-specific deep-dive shortcuts
 
 ## Medium-Term (Next 3–5 Milestones)
 

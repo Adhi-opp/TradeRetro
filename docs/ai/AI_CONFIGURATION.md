@@ -85,4 +85,4 @@ gemini include them in the request payload, and ollama forwards them via the
 
 ### What's Next
 
-See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for planned configuration improvements including environment variable overrides, per-provider configuration profiles, and a runtime configuration API.
+See [AI_FUTURE_ROADMAP.md](AI_FUTURE_ROADMAP.md) for planned broader configuration improvements, including additional environment-variable overrides, per-provider configuration profiles, and a runtime configuration API.
