@@ -148,7 +148,7 @@ async def submit_feedback(payload: FeedbackPayload):
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
-    except Exception as exc:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to persist feedback submission.")
 
     return {
