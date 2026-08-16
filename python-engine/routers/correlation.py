@@ -84,6 +84,7 @@ def _normalize_ticker(ticker: str) -> str:
 async def _load_wide_prices(
     tickers: list[str],
     min_date: Optional[date] = None,
+    days: int = 120,
 ) -> pd.DataFrame:
     """
     Load close prices for `tickers` from raw.historical_prices and pivot to
@@ -107,18 +108,19 @@ async def _load_wide_prices(
     query += " ORDER BY trade_date ASC"
 
     rows = []
+    db_unavailable = pool is None
     if pool is not None:
         try:
             async with pool.acquire() as conn:
                 rows = await conn.fetch(query, *params)
         except Exception:
-            pass
+            db_unavailable = True
 
-    if not rows:
+    if not rows and db_unavailable:
         from services.synthetic_fallback import generate_synthetic_candles
         dfs = []
         for t in tickers:
-            sdf = generate_synthetic_candles(t, days=lookback_days or 120)
+            sdf = generate_synthetic_candles(t, days=days or 120)
             sdf["ticker"] = t
             dfs.append(sdf[["date", "ticker", "close"]].rename(columns={"date": "trade_date", "close": "close_price"}))
         if not dfs:
@@ -126,6 +128,9 @@ async def _load_wide_prices(
         df = pd.concat(dfs, ignore_index=True)
         df["trade_date"] = pd.to_datetime(df["trade_date"])
         return df.pivot_table(index="trade_date", columns="ticker", values="close_price").dropna(how="all")
+
+    if not rows:
+        return pd.DataFrame()
 
     df = pd.DataFrame([dict(r) for r in rows])
     df["close_price"] = pd.to_numeric(df["close_price"], errors="coerce").astype(float)
@@ -170,7 +175,7 @@ async def correlation_matrix(
     requested = [_normalize_ticker(t) for t in (tickers or DEFAULT_MATRIX_TICKERS)]
 
     try:
-        prices = await _load_wide_prices(requested)
+        prices = await _load_wide_prices(requested, days=window_days)
     except Exception as exc:
         logger.exception("matrix: warehouse load failed")
         raise HTTPException(status_code=500, detail=f"warehouse query failed: {exc}") from exc
@@ -201,7 +206,7 @@ async def rolling_correlation(
     tickers = list({base_key, *peer_keys})
 
     try:
-        prices = await _load_wide_prices(tickers)
+        prices = await _load_wide_prices(tickers, days=window_days + lookback_days)
     except Exception as exc:
         logger.exception("rolling: warehouse load failed")
         raise HTTPException(status_code=500, detail=f"warehouse query failed: {exc}") from exc
@@ -244,7 +249,7 @@ async def lead_lag(
     tickers = list({base_key, *peer_keys})
 
     try:
-        prices = await _load_wide_prices(tickers)
+        prices = await _load_wide_prices(tickers, days=window_days)
     except Exception as exc:
         logger.exception("leadlag: warehouse load failed")
         raise HTTPException(status_code=500, detail=f"warehouse query failed: {exc}") from exc
@@ -285,7 +290,7 @@ async def heavyweight_divergence(
     tickers = list({base_key, *peer_keys})
 
     try:
-        prices = await _load_wide_prices(tickers)
+        prices = await _load_wide_prices(tickers, days=lookback_days)
     except Exception as exc:
         logger.exception("divergence: warehouse load failed")
         raise HTTPException(status_code=500, detail=f"warehouse query failed: {exc}") from exc
