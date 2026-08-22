@@ -513,6 +513,102 @@ Computed in the browser from the equity curve + trade log (no extra round-trip):
 
 ---
 
+## Mobile Client (React Native / Expo)
+
+TradeRetro also includes a React Native mobile client under `mobile/`.
+
+The mobile application is a client of the existing FastAPI service. It does not run the Python backtesting engine locally and does not connect directly to TimescaleDB or Redis.
+
+### Mobile Runtime
+
+| Component | Technology |
+|---|---|
+| Framework | React Native |
+| Runtime | Expo SDK 54 |
+| Language | TypeScript |
+| Navigation | React Navigation 7 |
+| Local persistence | AsyncStorage |
+| Graphics | react-native-svg |
+| API | Existing FastAPI service on port 8000 |
+
+### Mobile API Integration
+
+The mobile client uses the existing FastAPI backend rather than a mobile-specific API.
+
+The primary endpoints consumed by the mobile application are:
+
+| Method |	Endpoint |	Purpose |
+| --- | --- | --- |
+| GET	| /api/universe	| Load available instruments |
+| GET	| /api/live/quotes |	Load current market quotes |
+| GET	| /api/live/prices/{symbol} |	Load historical price data |
+| POST	| /api/backtest |	Execute a backtest |
+| GET	| /api/strategies |	Load available strategies |
+
+The request flow is:
+
+```
+Mobile App
+    │
+    │ HTTP
+    ▼
+FastAPI :8000
+    │
+    ├── Market Data
+    │      ├── Redis latest quotes
+    │      └── TimescaleDB / EOD data
+    │
+    └── Backtesting
+           │
+           ▼
+      Python Engine
+```
+
+### Running the Application
+
+The mobile client is run separately from the Docker Compose stack.
+
+From the repository root:
+
+```
+cd mobile
+copy .env.example .env
+npm install
+npm start
+```
+
+The step before installing the npm directory is essential in order to run the EXPO app on the user's system.
+
+It is important that the FastAPI backend is already running.
+
+```
+docker compose up -d
+```
+
+The backend should be reachable at:
+
+```
+http://<development-machine-ip>:8000
+```
+
+The mobile application runs through Expo and communicates with the FastAPI container:
+
+```
+┌──────────────────────┐
+│ React Native / Expo  │
+│      Mobile App      │
+└──────────┬───────────┘
+           │
+           │ HTTP
+           ▼
+┌──────────────────────┐
+│ FastAPI :8000        │
+│ Docker container     │
+└──────────────────────┘
+```
+
+---
+
 ## Grafana Dashboards (auto-provisioned)
 
 | Dashboard | What it shows | Source tables |

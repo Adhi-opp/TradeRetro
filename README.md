@@ -188,6 +188,151 @@ Alongside: a live ticker row (Redis-first, auto-polling), the India VIX gauge wi
 
 An in-app feedback modal (triggered from the sidebar) lets reviewers capture comments during the release process without leaving the product: category + free-text, submitted to `POST /api/feedback` and persisted server-side. It is a lightweight release-process channel, not a customer-support system.
 
+## Mobile Application
+
+TradeRetro includes a React Native mobile client built with Expo and TypeScript. The mobile application provides a focused interface for market monitoring, watchlist management, historical price analysis, and backtesting from a mobile device.
+
+The mobile application is located in `mobile/` and consumes the existing FastAPI backend. It does not introduce a separate trading engine, market-data pipeline, or database. The Python backtesting engine and data infrastructure remain shared with the main TradeRetro platform.
+
+### Mobile Features
+
+The current mobile client provides:
+
+- **Dashboard**
+  - Mobile entry point for the TradeRetro platform
+  - Access to market monitoring and watchlist workflows
+
+- **Market**
+  - Market/universe listing from the backend
+  - Current quote information
+  - Pull-to-refresh market data
+
+- **Market Detail**
+  - Current price and percentage change
+  - Historical price charts
+  - `1M`, `3M`, `6M`, and `1Y` periods
+  - Watchlist management
+  - Direct access to backtesting
+
+- **Watchlist**
+  - Locally persisted user-selected instruments
+  - Current quote information
+  - Refresh support
+  - Navigation to market details
+
+- **Backtesting**
+  - Market selection
+  - Strategy selection and parameter configuration
+  - Risk-management configuration
+  - Historical date range selection
+  - Execution through the existing TradeRetro backtest API
+
+- **Backtest Results**
+  - Equity curve
+  - Drawdown
+  - Performance statistics
+  - Transaction-cost information
+  - Trade-level results
+  - Strategy and simulation information
+
+### Mobile Backtesting
+
+The mobile application currently exposes the same five strategy families supported by the TradeRetro backtesting engine:
+
+1. Moving Average Crossover
+2. RSI
+3. MACD
+4. Bollinger Breakout
+5. Donchian Breakout
+
+The mobile client is only a presentation and interaction layer. Backtest calculations continue to be performed by the Python engine through the FastAPI backend.
+
+This ensures that web and mobile clients use the same deterministic backtesting implementation rather than maintaining separate trading logic.
+
+### Mobile Navigation
+
+The current navigation structure is:
+
+```text
+Main Tabs
+├── Dashboard
+├── Market
+└── Watchlist
+
+Stack Screens
+├── MarketDetail
+├── Backtest
+└── BacktestResults
+```
+
+A typical workflow is:
+
+```text
+Dashboard
+    │
+    ├── Market
+    │     └── Market Detail
+    │            ├── Add / Remove Watchlist
+    │            └── Run Backtest
+    │                   └── Backtest Results
+    │
+    └── Watchlist
+           └── Market Detail
+```
+### Mobile Technology
+
+| Layer             | Technology           |
+| ----------------- | -------------------- |
+| Framework         | React Native         |
+| Runtime           | Expo SDK 54          |
+| Language          | TypeScript           |
+| Navigation        | React Navigation 7   |
+| Local Storage     | AsyncStorage         |
+| Charts / Graphics | React Native SVG     |
+| Icons             | Expo Vector Icons    |
+| Backend           | Existing FastAPI API |
+
+### Mobile Architecture
+
+```text
+┌──────────────────────────────────────┐
+│          React Native / Expo         │
+│                                      │
+│  Dashboard   Market   Watchlist      │
+│                  │                   │
+│            Market Detail             │
+│                  │                   │
+│              Backtest                │
+│                  │                   │
+│          Backtest Results            │
+└──────────────────┬───────────────────┘
+                   │
+                   │ HTTP / JSON
+                   ▼
+┌──────────────────────────────────────┐
+│          Existing FastAPI API        │
+│              :8000                   │
+│                                      │
+│ /api/universe                        │
+│ /api/live/quotes                     │
+│ /api/live/prices/{symbol}            │
+│ /api/backtest                        │
+│ /api/strategies                      │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+        Existing TradeRetro Engine
+        + Market Data Infrastructure
+```
+
+### Mobile Scope
+
+The mobile application is currently intended for market research and quantitative analysis.
+
+It does not currently execute live broker orders or provide live trading execution. The mobile backtest workflow delegates calculations to the existing backend engine.
+
+The mobile client should therefore be considered an additional TradeRetro research interface rather than a separate trading platform.
+
 ## AI Copilot
 
 The Copilot is an **advisory sidecar** layered on the deterministic system:
